@@ -18,7 +18,8 @@ const AppRoutes = () => {
           <Route path="dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
           <Route path="courses" element={<PageTransition><CourseManagement /></PageTransition>} />
           <Route path="students" element={<PageTransition><StudentManagement /></PageTransition>} />
-          <Route path="mentors" element={<PageTransition><MentorAdminManagement /></PageTransition>} />
+          <Route path="admins" element={<PageTransition><MentorAdminManagement /></PageTransition>} />
+          <Route path="mentors" element={<Navigate to="/admin/admins" replace />} />
         </Route>
       </Routes>
     </AnimatePresence>

@@ -11,82 +11,14 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 
-const TRADING_COURSES = [
-  {
-    id: 'mock-1',
-    title: 'Stock Market Fundamentals',
-    priceInr: 499,
-    duration: '40 Hours',
-    totalModules: 12,
-    isPublished: true,
-    isUpcoming: false,
-    instructor: 'Rajesh Kumar',
-    sale: 843,
-    photo: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=100&h=100&fit=crop',
-  },
-  {
-    id: 'mock-2',
-    title: 'Technical Analysis Mastery',
-    priceInr: 799,
-    duration: '56 Hours',
-    totalModules: 18,
-    isPublished: true,
-    isUpcoming: false,
-    instructor: 'Priya Sharma',
-    sale: 621,
-    photo: 'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=100&h=100&fit=crop',
-  },
-  {
-    id: 'mock-3',
-    title: 'Options & Derivatives Trading',
-    priceInr: 1199,
-    duration: '72 Hours',
-    totalModules: 24,
-    isPublished: false,
-    isUpcoming: false,
-    instructor: 'Arjun Mehta',
-    sale: 385,
-    photo: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=100&h=100&fit=crop',
-  },
-  {
-    id: 'mock-4',
-    title: 'Forex Trading Strategies',
-    priceInr: 649,
-    duration: '48 Hours',
-    totalModules: 15,
-    isPublished: true,
-    isUpcoming: false,
-    instructor: 'Sneha Verma',
-    sale: 512,
-    photo: 'https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=100&h=100&fit=crop',
-  },
-  {
-    id: 'mock-5',
-    title: 'Cryptocurrency & Web3 Investing',
-    priceInr: 999,
-    duration: '64 Hours',
-    totalModules: 20,
-    isPublished: false,
-    isUpcoming: true,
-    instructor: 'Vikram Nair',
-    sale: 278,
-    photo: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=100&h=100&fit=crop',
-  },
-  {
-    id: 'mock-6',
-    title: 'Mutual Funds & SIP Planning',
-    priceInr: 399,
-    duration: '32 Hours',
-    totalModules: 10,
-    isPublished: true,
-    isUpcoming: false,
-    instructor: 'Anita Bose',
-    sale: 967,
-    photo: 'https://images.unsplash.com/photo-1579532537598-459ecdaf39cc?w=100&h=100&fit=crop',
-  },
-];
+const FILTER_OPTIONS = ['All', 'Published', 'Draft'];
 
-const FILTER_OPTIONS = ['All', 'Published', 'Pause', 'Upcoming'];
+const formatDate = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 export default function CourseManagement() {
   const [courses, setCourses] = useState([]);
@@ -110,7 +42,8 @@ export default function CourseManagement() {
       const res = await api.get('/courses');
       setCourses(res.courses || []);
     } catch {
-      setCourses(TRADING_COURSES);
+      setCourses([]);
+      toast.error('Failed to load courses');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +53,7 @@ export default function CourseManagement() {
 
   const filteredCourses = useMemo(() => {
     return courses.filter(c => {
-      const status = c.isUpcoming ? 'Upcoming' : (c.isPublished ? 'Published' : 'Pause');
+      const status = c.isPublished ? 'Published' : 'Draft';
       const matchesStatus = !filterStatus || status === filterStatus;
       const matchesSearch = !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
@@ -246,7 +179,7 @@ export default function CourseManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Courses</h1>
-          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Manage your trading & finance courses</p>
+          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Manage courses from backend API</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 px-4 shadow-sm h-10">
@@ -282,8 +215,7 @@ export default function CourseManagement() {
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-200">
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Course</th>
-                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Instructor</th>
-                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Sales</th>
+                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Created</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Price</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Lessons</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Duration</th>
@@ -293,17 +225,16 @@ export default function CourseManagement() {
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
-                  <TableSkeleton rows={6} cols={8} />
+                  <TableSkeleton rows={6} cols={7} />
                 ) : filteredCourses.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="p-10 text-center text-slate-400 dark:text-slate-500">No courses match your filter</td>
+                    <td colSpan="7" className="p-10 text-center text-slate-400 dark:text-slate-500">No courses match your filter</td>
                   </tr>
                 ) : filteredCourses.map((course) => {
-                  const statusText = course.isUpcoming ? 'Upcoming' : (course.isPublished ? 'Published' : 'Pause');
+                  const statusText = course.isPublished ? 'Published' : 'Draft';
                   const badgeClass =
                     statusText === 'Published' ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400' :
-                    statusText === 'Upcoming'  ? 'bg-amber-100/70 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400' :
-                                                 'bg-rose-100/70 text-rose-500 dark:bg-rose-900/40 dark:text-rose-400';
+                                                 'bg-amber-100/70 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400';
 
                   return (
                     <tr key={course.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 group transition-colors">
@@ -314,12 +245,11 @@ export default function CourseManagement() {
                           </div>
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{course.title}</p>
-                            <p className="text-[11px] text-slate-400 font-normal">#{course.id.replace('mock-', 'FF')}{Math.floor(Math.random() * 9000 + 1000)}</p>
+                            <p className="text-[11px] text-slate-400 font-normal">#{course.id}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">{course.instructor}</td>
-                      <td className="px-5 py-3.5">{course.sale}</td>
+                      <td className="px-5 py-3.5">{formatDate(course.createdAt)}</td>
                       <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">₹{course.priceInr}</td>
                       <td className="px-5 py-3.5">{course.totalModules}</td>
                       <td className="px-5 py-3.5">{course.duration}</td>

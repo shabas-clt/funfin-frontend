@@ -12,7 +12,7 @@ import { useEffect } from 'react';
 const menus = [
   { header: 'Menu' },
   { name: 'Dashboards', path: '/admin/dashboard', icon: LayoutDashboard, isDropdown: true },
-  { name: 'Teachers', path: '/admin/mentors', icon: Users, isDropdown: false },
+  { name: 'Admins', path: '/admin/admins', icon: Users, isDropdown: false },
   { name: 'Students', path: '/admin/students', icon: GraduationCap, isDropdown: false },
   { name: 'Course', path: '/admin/courses', icon: BookOpen, isDropdown: false },
   { name: 'Resource', path: '#', icon: Folder, isDropdown: true },
