@@ -29,7 +29,7 @@ const Header = ({ setIsSidebarOpen }) => {
 
         <div className="lg:hidden flex items-center shrink-0">
           <img src="/branding/logo-light.png" alt="FunFin" className="h-7 w-auto max-w-[120px] object-contain block dark:hidden" />
-          <img src="/branding/logo-dark.png" alt="FunFin" className="h-7 w-auto max-w-[120px] object-contain hidden dark:block" />
+          <img src="/branding/logo-dark.png" alt="FunFin" className="h-11 w-auto max-w-[120px] object-contain hidden dark:block" />
         </div>
 
         <div className="relative hidden sm:block w-[180px] md:w-[240px] lg:w-[300px]">

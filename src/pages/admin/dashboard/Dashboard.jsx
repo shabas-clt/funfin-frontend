@@ -135,11 +135,22 @@ export default function Dashboard() {
   };
 
   const transactions = [
-    { name: 'Rajesh Kumar',  course: 'Stock Market Fundamentals', amount: '₹499', method: 'UPI', status: 'Success' },
-    { name: 'Priya Sharma',  course: 'Technical Analysis Mastery', amount: '₹799', method: 'Card', status: 'Pending' },
-    { name: 'Arjun Mehta',   course: 'Options & Derivatives',      amount: '₹1199', method: 'NetBanking', status: 'Success' },
-    { name: 'Sneha Verma',   course: 'Forex Trading Strategies',   amount: '₹649', method: 'UPI', status: 'Failed' },
+    { name: 'Rajesh Kumar',  course: 'Stock Market Fundamentals', amount: '₹499', method: 'UPI', status: 'Success', cardLast4: '9876' },
+    { name: 'Priya Sharma',  course: 'Technical Analysis Mastery', amount: '₹799', method: 'Mastercard', status: 'Pending', cardLast4: '1264' },
+    { name: 'Arjun Mehta',   course: 'Options & Derivatives',      amount: '₹1199', method: 'Visa', status: 'Success', cardLast4: '3658' },
+    { name: 'Sneha Verma',   course: 'Forex Trading Strategies',   amount: '₹649', method: 'Paytm', status: 'Failed', cardLast4: '9971' },
   ];
+
+  const getPaymentMethodDetails = (method) => {
+    const methodIcons = {
+      UPI: { logo: '/payments/upi.png', label: 'UPI' },
+      Mastercard: { logo: '/payments/mastercard.png', label: 'Mastercard' },
+      Visa: { logo: '/payments/visa.png', label: 'Visa' },
+      Paytm: { logo: '/payments/paytm.png', label: 'Paytm' },
+      Card: { logo: '/payments/visa.png', label: 'Card' },
+    };
+    return methodIcons[method] || methodIcons.Card;
+  };
 
   return (
     <div className="space-y-6">
@@ -268,7 +279,26 @@ export default function Dashboard() {
                       </td>
                       <td className="px-5 py-3.5 text-slate-600 dark:text-slate-300 font-medium">{tx.course}</td>
                       <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">{tx.amount}</td>
-                      <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400">{tx.method}</td>
+                      <td className="px-5 py-3.5">
+                        {(() => {
+                          const methodInfo = getPaymentMethodDetails(tx.method);
+                          return (
+                            <div className="flex items-center gap-2">
+                              <div className="w-9 h-7 rounded-md bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 flex items-center justify-center overflow-hidden px-1">
+                                <img
+                                  src={methodInfo.logo}
+                                  alt={methodInfo.label}
+                                  className="max-h-4 w-auto object-contain"
+                                />
+                              </div>
+                              <div>
+                                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{methodInfo.label}</p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">•••• {tx.cardLast4}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-5 py-3.5">
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${statusClass}`}>{tx.status}</span>
                       </td>
