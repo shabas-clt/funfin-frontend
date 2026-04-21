@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Edit, Trash, Eye, KeyRound } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -10,6 +12,8 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { useAuth } from '@/context/AuthContext';
+import { adminCreateSchema, adminUpdateSchema } from '@/lib/validation/schemas';
+import { applyServerErrors } from '@/lib/validation/serverErrors';
 
 const ROLE_FILTER_OPTIONS = ['All', 'admin', 'superadmin'];
 
@@ -19,6 +23,31 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
+
+const ADD_DEFAULTS = {
+  fullName: '',
+  email: '',
+  password: '',
+  role: 'admin',
+  isActive: true,
+};
+
+const EDIT_DEFAULTS = {
+  fullName: '',
+  email: '',
+  role: 'admin',
+  isActive: true,
+  password: '',
+};
+
+// Field-level error text. Keeps the JSX visually consistent with the rest
+// of the admin panel.
+function FieldError({ error }) {
+  if (!error?.message) return null;
+  return (
+    <p className="mt-1 text-xs text-rose-500 dark:text-rose-400">{error.message}</p>
+  );
+}
 
 export default function AdminManagement() {
   const { admin: currentAdmin } = useAuth();
@@ -36,12 +65,17 @@ export default function AdminManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentRow, setCurrentRow] = useState(null);
 
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    role: 'admin',
-    isActive: true,
+  // Separate rhf instances so add/edit state don't trample each other if
+  // both modals are briefly open during a transition.
+  const addForm = useForm({
+    resolver: yupResolver(adminCreateSchema),
+    mode: 'onBlur',
+    defaultValues: ADD_DEFAULTS,
+  });
+  const editForm = useForm({
+    resolver: yupResolver(adminUpdateSchema),
+    mode: 'onBlur',
+    defaultValues: EDIT_DEFAULTS,
   });
 
   const fetchAdmins = async () => {
@@ -82,17 +116,12 @@ export default function AdminManagement() {
     fetchAdmins();
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-  };
-
   const openAddModal = () => {
     if (!isSuperAdmin) {
       toast.error('Only superadmin can add admin accounts');
       return;
     }
-    setFormData({ fullName: '', email: '', password: '', role: 'admin', isActive: true });
+    addForm.reset(ADD_DEFAULTS);
     setIsAddModalOpen(true);
   };
 
@@ -103,19 +132,17 @@ export default function AdminManagement() {
 
   const openEditModal = (admin) => {
     setCurrentRow(admin);
-    setFormData({
-      fullName: admin.fullName,
-      email: admin.email,
+    editForm.reset({
+      fullName: admin.fullName || '',
+      email: admin.email || '',
+      role: admin.role || 'admin',
+      isActive: Boolean(admin.isActive),
       password: '',
-      role: admin.role,
-      isActive: admin.isActive,
     });
     setIsEditModalOpen(true);
   };
 
-  const handleAddSubmit = async (e) => {
-    e.preventDefault();
-
+  const submitAdd = async (values) => {
     const confirm = await Swal.fire({
       title: 'Create admin account?',
       text: 'A new admin user will be created.',
@@ -128,27 +155,39 @@ export default function AdminManagement() {
     if (!confirm.isConfirmed) return;
 
     try {
-      await api.post('/admins', formData);
+      await api.post('/admins', values);
       setIsAddModalOpen(false);
       fetchAdmins();
       toast.success('Admin created successfully');
-    } catch (error) {
-      toast.error(error?.detail || 'Failed to create admin');
+    } catch (err) {
+      const fallback = applyServerErrors(addForm, err, 'Failed to create admin');
+      if (fallback) toast.error(fallback);
     }
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-
-    const payload = {
-      fullName: formData.fullName,
-      email: formData.email,
-      isActive: formData.isActive,
-    };
-
+  const submitEdit = async (values) => {
+    // Only send fields that actually changed so optional backend fields
+    // aren't overwritten with no-ops.
+    const payload = {};
+    if (values.fullName && values.fullName !== currentRow?.fullName) {
+      payload.fullName = values.fullName;
+    }
+    if (values.email && values.email !== currentRow?.email) {
+      payload.email = values.email;
+    }
+    if (typeof values.isActive === 'boolean' && values.isActive !== currentRow?.isActive) {
+      payload.isActive = values.isActive;
+    }
     if (isSuperAdmin) {
-      payload.role = formData.role;
-      if (formData.password.trim()) payload.password = formData.password.trim();
+      if (values.role && values.role !== currentRow?.role) {
+        payload.role = values.role;
+      }
+      const trimmed = (values.password || '').trim();
+      if (trimmed) payload.password = trimmed;
+    }
+    if (Object.keys(payload).length === 0) {
+      setIsEditModalOpen(false);
+      return;
     }
 
     try {
@@ -156,8 +195,9 @@ export default function AdminManagement() {
       setIsEditModalOpen(false);
       fetchAdmins();
       toast.success('Admin updated successfully');
-    } catch (error) {
-      toast.error(error?.detail || 'Failed to update admin');
+    } catch (err) {
+      const fallback = applyServerErrors(editForm, err, 'Failed to update admin');
+      if (fallback) toast.error(fallback);
     }
   };
 
@@ -172,8 +212,8 @@ export default function AdminManagement() {
       showCancelButton: true,
       confirmButtonText: 'Update password',
       preConfirm: (value) => {
-        if (!value || value.length < 6) {
-          Swal.showValidationMessage('Password must be at least 6 characters');
+        if (!value || value.length < 8) {
+          Swal.showValidationMessage('Password must be at least 8 characters');
           return false;
         }
         return value;
@@ -186,7 +226,7 @@ export default function AdminManagement() {
       await api.patch(`/admins/${row.id}`, { password: passwordPrompt.value });
       toast.success('Password updated successfully');
     } catch (error) {
-      toast.error(error?.detail || 'Failed to update password');
+      toast.error(typeof error === 'string' ? error : 'Failed to update password');
     }
   };
 
@@ -214,7 +254,7 @@ export default function AdminManagement() {
       fetchAdmins();
       toast.success('Admin removed');
     } catch (error) {
-      toast.error(error?.detail || 'Failed to remove admin');
+      toast.error(typeof error === 'string' ? error : 'Failed to remove admin');
     }
   };
 
@@ -346,33 +386,47 @@ export default function AdminManagement() {
       </Card>
 
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add New Admin">
-        <form onSubmit={handleAddSubmit} className="space-y-4">
+        <form onSubmit={addForm.handleSubmit(submitAdd)} noValidate className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
-            <Input name="fullName" value={formData.fullName} onChange={handleInputChange} required className={inputClass} />
+            <Input {...addForm.register('fullName')} className={inputClass} />
+            <FieldError error={addForm.formState.errors.fullName} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
-            <Input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
+            <Input type="email" {...addForm.register('email')} className={inputClass} />
+            <FieldError error={addForm.formState.errors.email} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Temporary Password</label>
-            <Input type="password" name="password" value={formData.password} onChange={handleInputChange} required className={inputClass} />
+            <Input type="password" {...addForm.register('password')} className={inputClass} />
+            <FieldError error={addForm.formState.errors.password} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
-            <select name="role" value={formData.role} onChange={handleInputChange} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1">
+            <select
+              {...addForm.register('role')}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1"
+            >
               <option value="admin">Admin</option>
               <option value="superadmin">Superadmin</option>
             </select>
+            <FieldError error={addForm.formState.errors.role} />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleInputChange} id="isActiveAdd" className="accent-indigo-500" />
+            <input
+              type="checkbox"
+              id="isActiveAdd"
+              className="accent-indigo-500"
+              {...addForm.register('isActive')}
+            />
             <label htmlFor="isActiveAdd" className="text-sm dark:text-slate-300">Account Active</label>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800">
             <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Create</Button>
+            <Button type="submit" disabled={addForm.formState.isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {addForm.formState.isSubmitting ? 'Creating...' : 'Create'}
+            </Button>
           </div>
         </form>
       </Modal>
@@ -389,37 +443,55 @@ export default function AdminManagement() {
       </Modal>
 
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Admin">
-        <form onSubmit={handleEditSubmit} className="space-y-4">
+        <form onSubmit={editForm.handleSubmit(submitEdit)} noValidate className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
-            <Input name="fullName" value={formData.fullName} onChange={handleInputChange} required className={inputClass} />
+            <Input {...editForm.register('fullName')} className={inputClass} />
+            <FieldError error={editForm.formState.errors.fullName} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
-            <Input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
+            <Input type="email" {...editForm.register('email')} className={inputClass} />
+            <FieldError error={editForm.formState.errors.email} />
           </div>
           {isSuperAdmin && (
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
-              <select name="role" value={formData.role} onChange={handleInputChange} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1">
+              <select
+                {...editForm.register('role')}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1"
+              >
                 <option value="admin">Admin</option>
                 <option value="superadmin">Superadmin</option>
               </select>
+              <FieldError error={editForm.formState.errors.role} />
             </div>
           )}
           {isSuperAdmin && (
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Set New Password (Optional)</label>
-              <Input type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Leave blank to keep current" className={inputClass} />
+              <Input
+                type="password"
+                placeholder="Leave blank to keep current"
+                className={inputClass}
+                {...editForm.register('password')}
+              />
             </div>
           )}
           <div className="flex items-center gap-2">
-            <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleInputChange} id="isActiveEdit" className="accent-indigo-500" />
+            <input
+              type="checkbox"
+              id="isActiveEdit"
+              className="accent-indigo-500"
+              {...editForm.register('isActive')}
+            />
             <label htmlFor="isActiveEdit" className="text-sm dark:text-slate-300">Account Active</label>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800">
             <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Save</Button>
+            <Button type="submit" disabled={editForm.formState.isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {editForm.formState.isSubmitting ? 'Saving...' : 'Save'}
+            </Button>
           </div>
         </form>
       </Modal>

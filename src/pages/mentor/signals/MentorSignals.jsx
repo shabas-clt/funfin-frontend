@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import { signalCreateSchema } from '@/lib/validation/schemas';
+import { applyServerErrors } from '@/lib/validation/serverErrors';
 
-const initialForm = {
+const INITIAL_FORM = {
   headline: '',
   instrument: '',
   exchange: '',
@@ -17,7 +21,7 @@ const initialForm = {
   targetPrices: '',
   timeframe: '',
   riskLevel: '',
-  confidence: '3',
+  confidence: 3,
   rationale: '',
   validUntil: '',
 };
@@ -35,12 +39,28 @@ const formatDateTime = (value) => {
   });
 };
 
+function FieldError({ error }) {
+  if (!error?.message) return null;
+  return <p className="mt-1 text-xs text-rose-500 dark:text-rose-400">{error.message}</p>;
+}
+
 export default function MentorSignals() {
-  const [form, setForm] = useState(initialForm);
   const [signals, setSignals] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const form = useForm({
+    resolver: yupResolver(signalCreateSchema),
+    mode: 'onBlur',
+    defaultValues: INITIAL_FORM,
+  });
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = form;
 
   const loadData = async () => {
     try {
@@ -64,38 +84,7 @@ export default function MentorSignals() {
     loadData();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const payload = {
-      headline: form.headline.trim(),
-      instrument: form.instrument.trim(),
-      exchange: form.exchange.trim() || undefined,
-      segment: form.segment.trim() || undefined,
-      direction: form.direction,
-      entryPrice: Number(form.entryPrice),
-      stopLoss: Number(form.stopLoss),
-      targetPrices: form.targetPrices
-        .split(',')
-        .map((v) => Number(v.trim()))
-        .filter((v) => Number.isFinite(v) && v > 0),
-      timeframe: form.timeframe.trim() || undefined,
-      riskLevel: form.riskLevel.trim() || undefined,
-      confidence: Number(form.confidence),
-      rationale: form.rationale.trim() || undefined,
-      validUntil: form.validUntil ? new Date(form.validUntil).toISOString() : undefined,
-    };
-
-    if (payload.targetPrices.length === 0) {
-      toast.error('Please add at least one valid target price');
-      return;
-    }
-
+  const onSubmit = async (values) => {
     const confirm = await Swal.fire({
       title: 'Publish this signal?',
       text: 'Subscribed students can view this signal instantly.',
@@ -107,16 +96,33 @@ export default function MentorSignals() {
     });
     if (!confirm.isConfirmed) return;
 
+    // Build the backend payload from validated, coerced values. Yup has
+    // already turned the comma-separated targetPrices into a number array
+    // and coerced numeric fields.
+    const payload = {
+      headline: values.headline,
+      instrument: values.instrument,
+      exchange: values.exchange || undefined,
+      segment: values.segment || undefined,
+      direction: values.direction,
+      entryPrice: values.entryPrice,
+      stopLoss: values.stopLoss,
+      targetPrices: values.targetPrices,
+      timeframe: values.timeframe || undefined,
+      riskLevel: values.riskLevel || undefined,
+      confidence: values.confidence,
+      rationale: values.rationale || undefined,
+      validUntil: values.validUntil ? new Date(values.validUntil).toISOString() : undefined,
+    };
+
     try {
-      setIsSubmitting(true);
       await api.post('/mentor/signals', payload);
       toast.success('Signal posted successfully');
-      setForm(initialForm);
+      reset(INITIAL_FORM);
       loadData();
-    } catch (error) {
-      toast.error(error?.detail || 'Failed to post signal');
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      const fallback = applyServerErrors(form, err, 'Failed to post signal');
+      if (fallback) toast.error(fallback);
     }
   };
 
@@ -130,68 +136,82 @@ export default function MentorSignals() {
       <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
         <CardContent className="p-5">
           <h2 className="text-[16px] font-bold text-slate-900 dark:text-white mb-4">Post New Signal</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium">Headline</label>
-              <Input name="headline" value={form.headline} onChange={handleChange} required className="mt-1" />
+              <Input {...register('headline')} className="mt-1" />
+              <FieldError error={errors.headline} />
             </div>
             <div>
               <label className="text-sm font-medium">Instrument</label>
-              <Input name="instrument" value={form.instrument} onChange={handleChange} required className="mt-1" />
+              <Input {...register('instrument')} className="mt-1" />
+              <FieldError error={errors.instrument} />
             </div>
             <div>
               <label className="text-sm font-medium">Direction</label>
-              <select name="direction" value={form.direction} onChange={handleChange} className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent dark:bg-neutral-900 dark:border-neutral-800">
+              <select
+                {...register('direction')}
+                className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent dark:bg-neutral-900 dark:border-neutral-800"
+              >
                 <option value="buy">BUY</option>
                 <option value="sell">SELL</option>
               </select>
+              <FieldError error={errors.direction} />
             </div>
             <div>
               <label className="text-sm font-medium">Timeframe</label>
-              <Input name="timeframe" value={form.timeframe} onChange={handleChange} className="mt-1" placeholder="Intraday / Swing" />
+              <Input {...register('timeframe')} className="mt-1" placeholder="Intraday / Swing" />
+              <FieldError error={errors.timeframe} />
             </div>
             <div>
               <label className="text-sm font-medium">Entry Price</label>
-              <Input type="number" step="0.01" name="entryPrice" value={form.entryPrice} onChange={handleChange} required className="mt-1" />
+              <Input type="number" step="0.01" {...register('entryPrice')} className="mt-1" />
+              <FieldError error={errors.entryPrice} />
             </div>
             <div>
               <label className="text-sm font-medium">Stop Loss</label>
-              <Input type="number" step="0.01" name="stopLoss" value={form.stopLoss} onChange={handleChange} required className="mt-1" />
+              <Input type="number" step="0.01" {...register('stopLoss')} className="mt-1" />
+              <FieldError error={errors.stopLoss} />
             </div>
             <div>
               <label className="text-sm font-medium">Targets (comma separated)</label>
-              <Input name="targetPrices" value={form.targetPrices} onChange={handleChange} required className="mt-1" placeholder="350.5, 355, 362" />
+              <Input {...register('targetPrices')} className="mt-1" placeholder="350.5, 355, 362" />
+              <FieldError error={errors.targetPrices} />
             </div>
             <div>
               <label className="text-sm font-medium">Confidence (1-5)</label>
-              <Input type="number" min="1" max="5" name="confidence" value={form.confidence} onChange={handleChange} className="mt-1" />
+              <Input type="number" min="1" max="5" {...register('confidence')} className="mt-1" />
+              <FieldError error={errors.confidence} />
             </div>
             <div>
               <label className="text-sm font-medium">Exchange</label>
-              <Input name="exchange" value={form.exchange} onChange={handleChange} className="mt-1" placeholder="NSE" />
+              <Input {...register('exchange')} className="mt-1" placeholder="NSE" />
+              <FieldError error={errors.exchange} />
             </div>
             <div>
               <label className="text-sm font-medium">Segment</label>
-              <Input name="segment" value={form.segment} onChange={handleChange} className="mt-1" placeholder="EQ / FNO" />
+              <Input {...register('segment')} className="mt-1" placeholder="EQ / FNO" />
+              <FieldError error={errors.segment} />
             </div>
             <div>
               <label className="text-sm font-medium">Risk Level</label>
-              <Input name="riskLevel" value={form.riskLevel} onChange={handleChange} className="mt-1" placeholder="Low / Medium / High" />
+              <Input {...register('riskLevel')} className="mt-1" placeholder="Low / Medium / High" />
+              <FieldError error={errors.riskLevel} />
             </div>
             <div>
               <label className="text-sm font-medium">Valid Until</label>
-              <Input type="datetime-local" name="validUntil" value={form.validUntil} onChange={handleChange} className="mt-1" />
+              <Input type="datetime-local" {...register('validUntil')} className="mt-1" />
+              <FieldError error={errors.validUntil} />
             </div>
             <div className="md:col-span-2">
               <label className="text-sm font-medium">Rationale</label>
               <textarea
-                name="rationale"
-                value={form.rationale}
-                onChange={handleChange}
+                {...register('rationale')}
                 rows="3"
                 className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm dark:bg-neutral-900 dark:border-neutral-800"
                 placeholder="Technical or fundamental reasoning..."
               />
+              <FieldError error={errors.rationale} />
             </div>
             <div className="md:col-span-2 flex justify-end">
               <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">

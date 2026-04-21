@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Edit, Trash, Eye } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -9,6 +11,8 @@ import { FilterDropdown } from '@/components/ui/filter-dropdown';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import { mentorCreateSchema, mentorUpdateSchema } from '@/lib/validation/schemas';
+import { applyServerErrors } from '@/lib/validation/serverErrors';
 
 const STATUS_FILTER_OPTIONS = ['All', 'Active', 'Inactive'];
 
@@ -18,6 +22,14 @@ const formatDate = (value) => {
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
+
+const ADD_DEFAULTS = { fullName: '', email: '', password: '', isActive: true };
+const EDIT_DEFAULTS = { fullName: '', email: '', password: '', isActive: true };
+
+function FieldError({ error }) {
+  if (!error?.message) return null;
+  return <p className="mt-1 text-xs text-rose-500 dark:text-rose-400">{error.message}</p>;
+}
 
 export default function MentorManagement() {
   const [mentors, setMentors] = useState([]);
@@ -30,11 +42,15 @@ export default function MentorManagement() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [currentRow, setCurrentRow] = useState(null);
 
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    isActive: true,
+  const addForm = useForm({
+    resolver: yupResolver(mentorCreateSchema),
+    mode: 'onBlur',
+    defaultValues: ADD_DEFAULTS,
+  });
+  const editForm = useForm({
+    resolver: yupResolver(mentorUpdateSchema),
+    mode: 'onBlur',
+    defaultValues: EDIT_DEFAULTS,
   });
 
   const fetchMentors = async () => {
@@ -66,23 +82,18 @@ export default function MentorManagement() {
     });
   }, [mentors, filterStatus, searchQuery]);
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-  };
-
   const openAddModal = () => {
-    setFormData({ fullName: '', email: '', password: '', isActive: true });
+    addForm.reset(ADD_DEFAULTS);
     setIsAddModalOpen(true);
   };
 
   const openEditModal = (mentor) => {
     setCurrentRow(mentor);
-    setFormData({
-      fullName: mentor.fullName,
-      email: mentor.email,
+    editForm.reset({
+      fullName: mentor.fullName || '',
+      email: mentor.email || '',
       password: '',
-      isActive: mentor.isActive,
+      isActive: Boolean(mentor.isActive),
     });
     setIsEditModalOpen(true);
   };
@@ -92,9 +103,7 @@ export default function MentorManagement() {
     setIsViewModalOpen(true);
   };
 
-  const handleAddSubmit = async (e) => {
-    e.preventDefault();
-
+  const submitAdd = async (values) => {
     const confirm = await Swal.fire({
       title: 'Add new mentor?',
       text: 'This creates a mentor panel account.',
@@ -106,32 +115,43 @@ export default function MentorManagement() {
     if (!confirm.isConfirmed) return;
 
     try {
-      await api.post('/admins', { ...formData, role: 'mentor' });
+      await api.post('/admins', { ...values, role: 'mentor' });
       setIsAddModalOpen(false);
       fetchMentors();
       toast.success('Mentor created successfully');
-    } catch (error) {
-      toast.error(error?.detail || 'Failed to create mentor');
+    } catch (err) {
+      const fallback = applyServerErrors(addForm, err, 'Failed to create mentor');
+      if (fallback) toast.error(fallback);
     }
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
+  const submitEdit = async (values) => {
+    const payload = {};
+    if (values.fullName && values.fullName !== currentRow?.fullName) {
+      payload.fullName = values.fullName;
+    }
+    if (values.email && values.email !== currentRow?.email) {
+      payload.email = values.email;
+    }
+    if (typeof values.isActive === 'boolean' && values.isActive !== currentRow?.isActive) {
+      payload.isActive = values.isActive;
+    }
+    const trimmed = (values.password || '').trim();
+    if (trimmed) payload.password = trimmed;
 
-    const payload = {
-      fullName: formData.fullName,
-      email: formData.email,
-      isActive: formData.isActive,
-    };
-    if (formData.password.trim()) payload.password = formData.password.trim();
+    if (Object.keys(payload).length === 0) {
+      setIsEditModalOpen(false);
+      return;
+    }
 
     try {
       await api.patch(`/admins/${currentRow.id}`, payload);
       setIsEditModalOpen(false);
       fetchMentors();
       toast.success('Mentor updated successfully');
-    } catch (error) {
-      toast.error(error?.detail || 'Failed to update mentor');
+    } catch (err) {
+      const fallback = applyServerErrors(editForm, err, 'Failed to update mentor');
+      if (fallback) toast.error(fallback);
     }
   };
 
@@ -154,7 +174,7 @@ export default function MentorManagement() {
       fetchMentors();
       toast.success('Mentor removed');
     } catch (error) {
-      toast.error(error?.detail || 'Failed to remove mentor');
+      toast.error(typeof error === 'string' ? error : 'Failed to remove mentor');
     }
   };
 
@@ -257,26 +277,31 @@ export default function MentorManagement() {
       </Card>
 
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add New Mentor">
-        <form onSubmit={handleAddSubmit} className="space-y-4">
+        <form onSubmit={addForm.handleSubmit(submitAdd)} noValidate className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
-            <Input name="fullName" value={formData.fullName} onChange={handleInputChange} required className={inputClass} />
+            <Input {...addForm.register('fullName')} className={inputClass} />
+            <FieldError error={addForm.formState.errors.fullName} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
-            <Input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
+            <Input type="email" {...addForm.register('email')} className={inputClass} />
+            <FieldError error={addForm.formState.errors.email} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Temporary Password</label>
-            <Input type="password" name="password" value={formData.password} onChange={handleInputChange} required className={inputClass} />
+            <Input type="password" {...addForm.register('password')} className={inputClass} />
+            <FieldError error={addForm.formState.errors.password} />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleInputChange} id="mentorIsActiveAdd" className="accent-indigo-500" />
+            <input type="checkbox" id="mentorIsActiveAdd" className="accent-indigo-500" {...addForm.register('isActive')} />
             <label htmlFor="mentorIsActiveAdd" className="text-sm dark:text-slate-300">Account Active</label>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800">
             <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Create</Button>
+            <Button type="submit" disabled={addForm.formState.isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {addForm.formState.isSubmitting ? 'Creating...' : 'Create'}
+            </Button>
           </div>
         </form>
       </Modal>
@@ -292,26 +317,31 @@ export default function MentorManagement() {
       </Modal>
 
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Mentor">
-        <form onSubmit={handleEditSubmit} className="space-y-4">
+        <form onSubmit={editForm.handleSubmit(submitEdit)} noValidate className="space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
-            <Input name="fullName" value={formData.fullName} onChange={handleInputChange} required className={inputClass} />
+            <Input {...editForm.register('fullName')} className={inputClass} />
+            <FieldError error={editForm.formState.errors.fullName} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
-            <Input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} />
+            <Input type="email" {...editForm.register('email')} className={inputClass} />
+            <FieldError error={editForm.formState.errors.email} />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Set New Password (Optional)</label>
-            <Input type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Leave blank to keep current" className={inputClass} />
+            <Input type="password" placeholder="Leave blank to keep current" className={inputClass} {...editForm.register('password')} />
+            <FieldError error={editForm.formState.errors.password} />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleInputChange} id="mentorIsActiveEdit" className="accent-indigo-500" />
+            <input type="checkbox" id="mentorIsActiveEdit" className="accent-indigo-500" {...editForm.register('isActive')} />
             <label htmlFor="mentorIsActiveEdit" className="text-sm dark:text-slate-300">Account Active</label>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800">
             <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Save</Button>
+            <Button type="submit" disabled={editForm.formState.isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {editForm.formState.isSubmitting ? 'Saving...' : 'Save'}
+            </Button>
           </div>
         </form>
       </Modal>
