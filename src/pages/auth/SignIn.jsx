@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
@@ -11,19 +11,38 @@ export default function SignIn() {
   const { login } = useAuth();
 
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const from = location.state?.from?.pathname || '/admin/dashboard';
 
+  const validate = () => {
+    const e = {};
+    if (!formData.email) {
+      e.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      e.email = 'Invalid email address';
+    }
+    if (!formData.password) {
+      e.password = 'Password is required';
+    }
+    return e;
+  };
+
   const handleChange = (e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    if (serverError) setServerError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      toast.error('Email and password are required');
+    const validation = validate();
+    if (Object.keys(validation).length > 0) {
+      setErrors(validation);
       return;
     }
 
@@ -34,6 +53,7 @@ export default function SignIn() {
       navigate(from, { replace: true });
     } catch (err) {
       const message = typeof err === 'string' ? err : 'Invalid email or password';
+      setServerError(message);
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -41,168 +61,128 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-black">
-      {/* Left panel — branding, hidden on small screens */}
-      <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative flex-col justify-between overflow-hidden">
-        {/* Gradient base */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0f0c29] via-[#1a1550] to-[#0d0d1a]" />
+    <div className="min-h-screen flex items-center justify-center bg-[#F0f2f5] dark:bg-[#0f0f0f] px-4 py-10 transition-colors">
+      {/* Card */}
+      <div className="w-full max-w-sm bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl shadow-xl dark:shadow-2xl overflow-hidden transition-colors">
 
-        {/* Decorative blobs */}
-        <div className="absolute top-[-80px] left-[-80px] w-[420px] h-[420px] bg-indigo-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-60px] right-[-60px] w-[340px] h-[340px] bg-violet-500/20 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[80px]" />
+        {/* Top accent bar */}
+        <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-400" />
 
-        {/* Grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',
-            backgroundSize: '60px 60px',
-          }}
-        />
-
-        {/* Content */}
-        <div className="relative z-10 p-10">
-          <div className="flex items-center gap-3">
+        <div className="px-8 py-8">
+          {/* Logo switching between Light and Dark mode */}
+          <div className="flex justify-center mb-6">
+            <img
+              src="/branding/logo-light.png"
+              alt="FunFin"
+              className="h-14 w-auto object-contain block dark:hidden"
+            />
             <img
               src="/branding/logo-dark.png"
               alt="FunFin"
-              className="h-12 w-auto object-contain"
+              className="h-14 w-auto object-contain hidden dark:block"
             />
           </div>
-        </div>
 
-        <div className="relative z-10 px-12 pb-16">
-          <div className="mb-8">
-            <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight tracking-tight">
-              Admin Panel
-              <br />
-              <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-                Control Centre
-              </span>
-            </h1>
-            <p className="mt-4 text-slate-400 text-base leading-relaxed max-w-sm">
-              Manage students, courses, mentors, and platform analytics from a single unified interface.
-            </p>
-          </div>
+          {/* Title */}
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-center mb-1">
+            Admin Login
+          </h2>
+          <p className="text-sm text-slate-500 text-center mb-7">
+            Sign in to your admin account
+          </p>
 
-          {/* Stat pills */}
-          <div className="flex flex-wrap gap-3">
-            {[
-              { label: 'Active Courses', val: '120+' },
-              { label: 'Students', val: '72K' },
-              { label: 'Revenue', val: '₹80L+' },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2"
-              >
-                <span className="text-white font-bold text-sm">{stat.val}</span>
-                <span className="text-slate-400 text-xs">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+          {/* Server error alert */}
+          {serverError && (
+            <div className="mb-5 flex items-start gap-2.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 text-sm rounded-xl px-4 py-3">
+              <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 110 18A9 9 0 0112 3z" />
+              </svg>
+              <span>{serverError}</span>
+            </div>
+          )}
 
-        {/* Bottom tag */}
-        <div className="relative z-10 px-10 pb-6 flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs text-slate-500">Secured admin access — FunFin LMS</span>
-        </div>
-      </div>
-
-      {/* Right panel — sign in form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-5 sm:px-8 lg:px-12 py-10 bg-black">
-        {/* Mobile logo */}
-        <div className="lg:hidden mb-8 self-start">
-          <img
-            src="/branding/logo-dark.png"
-            alt="FunFin"
-            className="h-10 w-auto object-contain"
-          />
-        </div>
-
-        <div className="w-full max-w-[400px]">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white">Welcome back</h2>
-            <p className="text-slate-500 text-sm mt-1.5">
-              Sign in to access your admin dashboard
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-[13px] font-medium text-slate-400 mb-1.5">
-                Email address
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Email
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="admin@funfin.com"
-                  className="w-full bg-neutral-900 border border-neutral-800 text-white text-sm pl-10 pr-4 py-3 rounded-xl placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                />
-              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="you@funfin.com"
+                className={`w-full bg-slate-50 dark:bg-neutral-800 text-slate-900 dark:text-white text-sm px-4 py-3 rounded-xl border transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  errors.email
+                    ? 'border-rose-500 focus:ring-rose-500'
+                    : 'border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600'
+                }`}
+              />
+              {errors.email && (
+                <p className="mt-1.5 text-xs text-rose-500 dark:text-rose-400">{errors.email}</p>
+              )}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-[13px] font-medium text-slate-400 mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
-                  required
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className="w-full bg-neutral-900 border border-neutral-800 text-white text-sm pl-10 pr-12 py-3 rounded-xl placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  className={`w-full bg-slate-50 dark:bg-neutral-800 text-slate-900 dark:text-white text-sm px-4 py-3 pr-11 rounded-xl border transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                    errors.password
+                      ? 'border-rose-500 focus:ring-rose-500'
+                      : 'border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600'
+                  }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
+                  tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword
+                    ? <EyeOff className="w-4 h-4" />
+                    : <Eye className="w-4 h-4" />
+                  }
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1.5 text-xs text-rose-500 dark:text-rose-400">{errors.password}</p>
+              )}
             </div>
 
-            {/* Submit button */}
+            {/* Submit */}
             <button
               id="signin-submit"
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-all duration-200 mt-2 shadow-lg shadow-indigo-600/20"
+              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-all duration-150 mt-1"
             >
               {isLoading ? (
-                <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-              ) : (
                 <>
-                  <LogIn className="w-4 h-4" />
-                  Sign in
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Logging in...
                 </>
+              ) : (
+                'Login'
               )}
             </button>
           </form>
 
-          <p className="text-xs text-slate-600 text-center mt-8 leading-relaxed">
-            Access is restricted to authorized admin accounts only.
-            <br />
-            Contact your system administrator if you need access.
+          <p className="text-xs text-slate-500 dark:text-slate-600 text-center mt-7">
+            Restricted to authorized admin accounts only.
           </p>
         </div>
       </div>

@@ -1,8 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = () => {
-  const { isAuthenticated } = useAuth();
+const ProtectedRoute = ({ allowedRoles = [] }) => {
+  const { isAuthenticated, admin } = useAuth();
   const location = useLocation();
 
   // null means the context is still hydrating from cookie
@@ -16,6 +16,15 @@ const ProtectedRoute = () => {
 
   if (!isAuthenticated) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles.length > 0) {
+    const role = String(admin?.role || '').toLowerCase();
+    const isAllowed = allowedRoles.includes(role);
+    if (!isAllowed) {
+      const fallback = role === 'mentor' ? '/mentor/dashboard' : '/admin/dashboard';
+      return <Navigate to={fallback} replace />;
+    }
   }
 
   return <Outlet />;

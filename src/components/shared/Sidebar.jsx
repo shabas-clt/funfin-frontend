@@ -1,32 +1,30 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
-  Folder, Award, MessageSquare, FileText, ShieldCheck,
-  Settings, HelpCircle, X, ChevronDown
+  Radio, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 
-
-
-const menus = [
-  { header: 'Menu' },
-  { name: 'Dashboards', path: '/admin/dashboard', icon: LayoutDashboard, isDropdown: true },
-  { name: 'Admins', path: '/admin/admins', icon: Users, isDropdown: false },
-  { name: 'Students', path: '/admin/students', icon: GraduationCap, isDropdown: false },
-  { name: 'Course', path: '/admin/courses', icon: BookOpen, isDropdown: false },
-  { name: 'Resource', path: '#', icon: Folder, isDropdown: true },
-  { name: 'Certificate', path: '#', icon: Award, isDropdown: false },
-  { name: 'Chat', path: '#', icon: MessageSquare, isDropdown: false },
-  { name: 'Pages', path: '#', icon: FileText, isDropdown: true },
-  { name: 'Authentication', path: '#', icon: ShieldCheck, isDropdown: true },
-  { header: 'Help' },
-  { name: 'Settings', path: '#', icon: Settings, isDropdown: false },
-  { name: 'Support', path: '#', icon: HelpCircle, isDropdown: true },
+const adminMenus = [
+  { header: 'Overview' },
+  { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+  { header: 'Management' },
+  { name: 'Admins', path: '/admin/admins', icon: Users },
+  { name: 'Mentors', path: '/admin/mentors', icon: Radio },
+  { name: 'Students', path: '/admin/students', icon: GraduationCap },
+  { name: 'Courses', path: '/admin/courses', icon: BookOpen },
 ];
 
-const Sidebar = ({ isOpen, setIsOpen }) => {
+const mentorMenus = [
+  { header: 'Mentor Panel' },
+  { name: 'Dashboard', path: '/mentor/dashboard', icon: LayoutDashboard },
+  { name: 'Signals', path: '/mentor/signals', icon: Radio },
+];
+
+const Sidebar = ({ isOpen, setIsOpen, role = 'admin' }) => {
   const location = useLocation();
+  const menus = role === 'mentor' ? mentorMenus : adminMenus;
 
   useEffect(() => {
     const handleResize = () => {
@@ -77,15 +75,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 );
               }
               const Icon = item.icon;
-              const isActive = location.pathname.startsWith(item.path) && item.path !== '#';
+              const isActive = location.pathname.startsWith(item.path);
 
               return (
                 <NavLink
                   key={index}
                   to={item.path}
                   onClick={(e) => {
-                    if (item.path === '#') e.preventDefault();
-                    if (window.innerWidth < 1024 && item.path !== '#') setIsOpen(false);
+                    if (window.innerWidth < 1024) setIsOpen(false);
                   }}
                   className={cn(
                     "flex items-center justify-between rounded-lg px-3 py-2.5 text-[14px] font-medium transition-all duration-200 group relative",
@@ -98,27 +95,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     <Icon className={cn("w-4.5 h-4.5", isActive ? "text-[#6366f1]" : "text-[#7B86B7] dark:text-neutral-500 group-hover:text-[#6366f1]")} strokeWidth={2} />
                     <span>{item.name}</span>
                   </div>
-                  {item.isDropdown && (
-                    <ChevronDown className={cn("w-4 h-4", isActive ? "text-[#6366f1]" : "text-slate-400 group-hover:text-[#6366f1]")} />
-                  )}
                 </NavLink>
               );
             })}
-          </div>
-
-          <div className="mt-10 rounded-xl bg-slate-50 dark:bg-neutral-900 p-4 mx-2 relative overflow-hidden border border-slate-100/60 dark:border-neutral-800/80">
-            <div className="flex justify-between items-start mb-1">
-              <h4 className="text-[13px] font-bold text-[#0f172a] dark:text-white">New Features available</h4>
-              <button className="text-slate-400 hover:text-slate-600 text-xs"><X className="w-3.5 h-3.5" /></button>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">Check out the new dashboard view. Pages now load faster.</p>
-            <div className="h-20 rounded-lg relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-violet-600"></div>
-              <div className="relative z-10 p-2.5 text-white">
-                <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">Platform update</p>
-                <p className="text-[13px] font-black uppercase leading-tight mt-0.5">TRADE<br /><span className="text-yellow-300">SMARTER</span></p>
-              </div>
-            </div>
           </div>
         </nav>
       </aside>

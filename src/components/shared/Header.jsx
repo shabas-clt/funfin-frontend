@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Bell, Settings, Menu, MessageSquareShare, User, Mail, Users, HelpCircle, LogOut, Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import Swal from 'sweetalert2';
 
 const Header = ({ setIsSidebarOpen }) => {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -14,7 +15,20 @@ const Header = ({ setIsSidebarOpen }) => {
   const adminName = admin?.fullName || 'Admin';
   const adminEmail = admin?.email || '';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: 'Log out now?',
+      text: 'Your current session will end on this browser.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, log out',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
     setProfileOpen(false);
     logout();
     navigate('/auth/login', { replace: true });
