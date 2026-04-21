@@ -170,33 +170,13 @@ export const courseUpdateSchema = yup.object({
   tags: tagsField,
 });
 
-// ----- admin: syllabus (module) -----
-
-export const syllabusCreateSchema = yup.object({
-  title: requiredString('Module title').min(2),
-  moduleLabel: requiredString('Module label').min(1),
-  coverImage: yup.string().trim().optional(),
-});
-
-// ----- admin: topic (video) -----
-
-export const topicCreateSchema = yup.object({
-  title: requiredString('Video title').min(2),
-  overview: requiredString('Overview').min(10),
-  videoUrl: requiredString('Video file'),
-  order: yup
-    .number()
-    .typeError('Order must be a number')
-    .integer()
-    .min(0)
-    .default(0),
-  durationSec: yup
-    .number()
-    .typeError('Duration must be a number')
-    .integer()
-    .min(0)
-    .default(0),
-});
+// Note: syllabus (module) and topic (video) create/update payloads are
+// validated inline in SyllabusEditor since those rows are added through
+// several small, context-dependent forms rather than one monolithic form.
+// If we ever consolidate them, the rules to enforce are:
+//   - module: title >= 2 chars, moduleLabel required, coverImage optional URL.
+//   - topic: title >= 2 chars, overview >= 10 chars, videoUrl required,
+//     order and durationSec non-negative integers.
 
 // ----- mentor: signals -----
 // Backend: TradingSignalCreateInput (see app/schemas/signal.py).

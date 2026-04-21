@@ -16,6 +16,11 @@ import { deleteObject } from '@/api/media';
 // order values between adjacent rows and PATCH both in a single batch.
 
 function TopicCard({ topic, index, total, onMove, onUpdate, onDelete, busy }) {
+  // Using `key={topic.id}` on the parent list would remount and reset these
+  // on identity change; we opt for local state here because the parent does
+  // remount on reload. If we ever switch to in-place updates, add a keyed
+  // remount at the call site rather than a resync effect (to keep this file
+  // free of the react-hooks/set-state-in-effect pattern).
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(topic.title);
   const [draftOverview, setDraftOverview] = useState(topic.overview || '');
