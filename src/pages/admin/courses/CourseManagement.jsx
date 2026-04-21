@@ -134,38 +134,38 @@ export default function CourseManagement() {
     <div className="space-y-4 max-h-[65vh] overflow-y-auto px-1 pr-2">
       <div>
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Course Title</label>
-        <Input name="title" value={formData.title} onChange={handleInputChange} required minLength={2} className="dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1" />
+        <Input name="title" value={formData.title} onChange={handleInputChange} required minLength={2} className="dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1" />
       </div>
       <div>
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
         <textarea
           name="description" value={formData.description} onChange={handleInputChange} required minLength={10}
-          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 min-h-[80px] dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1"
+          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 min-h-[80px] dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1"
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (INR)</label>
-          <Input type="number" name="priceInr" value={formData.priceInr} onChange={handleInputChange} min={0} className="dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1" />
+          <Input type="number" name="priceInr" value={formData.priceInr} onChange={handleInputChange} min={0} className="dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1" />
         </div>
         <div>
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (FunCoins)</label>
-          <Input type="number" name="priceFuncoins" value={formData.priceFuncoins} onChange={handleInputChange} min={0} className="dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1" />
+          <Input type="number" name="priceFuncoins" value={formData.priceFuncoins} onChange={handleInputChange} min={0} className="dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Duration</label>
-          <Input name="duration" value={formData.duration} onChange={handleInputChange} required className="dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1" />
+          <Input name="duration" value={formData.duration} onChange={handleInputChange} required className="dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1" />
         </div>
         <div>
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Total Modules</label>
-          <Input type="number" name="totalModules" value={formData.totalModules} onChange={handleInputChange} min={0} className="dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1" />
+          <Input type="number" name="totalModules" value={formData.totalModules} onChange={handleInputChange} min={0} className="dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1" />
         </div>
       </div>
       <div>
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Banner Photo URL</label>
-        <Input name="photo" value={formData.photo} onChange={handleInputChange} className="dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1" />
+        <Input name="photo" value={formData.photo} onChange={handleInputChange} className="dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1" />
       </div>
       <div className="flex items-center gap-2 pt-1">
         <input type="checkbox" name="isPublished" checked={formData.isPublished} onChange={handleInputChange} id="isPublishedField" className="accent-indigo-500" />
@@ -191,7 +191,7 @@ export default function CourseManagement() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-slate-800 rounded-2xl overflow-hidden pb-4">
+      <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl overflow-hidden pb-4">
         <CardContent className="p-0">
           <div className="p-5 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="relative w-full md:w-[340px]">
@@ -201,7 +201,7 @@ export default function CourseManagement() {
                 placeholder="Search courses..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 text-[13px] bg-[#f8fafc] dark:bg-slate-900 border border-transparent dark:border-slate-700 focus:border-slate-200 dark:focus:border-slate-600 focus:bg-white dark:focus:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-100 dark:focus:ring-slate-700 transition-all placeholder:text-slate-400 dark:text-slate-300"
+                className="w-full pl-10 pr-4 py-2.5 text-[13px] bg-[#f8fafc] dark:bg-neutral-900 border border-transparent dark:border-neutral-800 focus:border-slate-200 dark:focus:border-neutral-700 focus:bg-white dark:focus:bg-neutral-950 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-100 dark:focus:ring-neutral-800 transition-all placeholder:text-slate-400 dark:text-slate-300"
               />
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
@@ -213,7 +213,7 @@ export default function CourseManagement() {
           <div className="overflow-x-auto px-2">
             <table className="w-full text-[13px] text-left whitespace-nowrap">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-200">
+                <tr className="border-b border-slate-100 dark:border-neutral-800 text-slate-900 dark:text-slate-200">
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Course</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Created</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Price</th>
@@ -223,7 +223,7 @@ export default function CourseManagement() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50 text-slate-600 dark:text-slate-300 font-medium">
+              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={6} cols={7} />
                 ) : filteredCourses.length === 0 ? (
@@ -237,7 +237,7 @@ export default function CourseManagement() {
                                                  'bg-amber-100/70 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400';
 
                   return (
-                    <tr key={course.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 group transition-colors">
+                    <tr key={course.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-900/70 group transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden shadow-sm shrink-0">
@@ -281,7 +281,7 @@ export default function CourseManagement() {
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Create Course">
         <form onSubmit={handleAddSubmit}>
           {formFields}
-          <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-700 mt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800 mt-4">
             <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Create</Button>
           </div>
@@ -291,7 +291,7 @@ export default function CourseManagement() {
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Course">
         <form onSubmit={handleEditSubmit}>
           {formFields}
-          <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-700 mt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800 mt-4">
             <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Save Changes</Button>
           </div>

@@ -131,7 +131,7 @@ export default function MentorAdminManagement() {
     }
   };
 
-  const inputClass = 'dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1';
+  const inputClass = 'dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1';
 
   return (
     <div className="space-y-5">
@@ -150,7 +150,7 @@ export default function MentorAdminManagement() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-slate-800 rounded-2xl overflow-hidden pb-4">
+      <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl overflow-hidden pb-4">
         <CardContent className="p-0">
           <div className="p-5 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="relative w-full md:w-[340px]">
@@ -160,7 +160,7 @@ export default function MentorAdminManagement() {
                 placeholder="Search by name or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 text-[13px] bg-[#f8fafc] dark:bg-slate-900 border border-transparent dark:border-slate-700 focus:border-slate-200 dark:focus:border-slate-600 focus:bg-white dark:focus:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-100 dark:focus:ring-slate-700 transition-all placeholder:text-slate-400 dark:text-slate-300"
+                className="w-full pl-10 pr-4 py-2.5 text-[13px] bg-[#f8fafc] dark:bg-neutral-900 border border-transparent dark:border-neutral-800 focus:border-slate-200 dark:focus:border-neutral-700 focus:bg-white dark:focus:bg-neutral-950 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-100 dark:focus:ring-neutral-800 transition-all placeholder:text-slate-400 dark:text-slate-300"
               />
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
@@ -172,7 +172,7 @@ export default function MentorAdminManagement() {
           <div className="overflow-x-auto px-2">
             <table className="w-full text-[13px] text-left whitespace-nowrap">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-700">
+                <tr className="border-b border-slate-100 dark:border-neutral-800">
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Name</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Role</th>
@@ -181,7 +181,7 @@ export default function MentorAdminManagement() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50 text-slate-600 dark:text-slate-300 font-medium">
+              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={5} cols={6} />
                 ) : filtered.length === 0 ? (
@@ -195,7 +195,7 @@ export default function MentorAdminManagement() {
                     : 'bg-rose-100/70 text-rose-500 dark:bg-rose-900/40 dark:text-rose-400';
 
                   return (
-                    <tr key={person.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 group transition-colors">
+                    <tr key={person.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-900/70 group transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <img
@@ -253,7 +253,7 @@ export default function MentorAdminManagement() {
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
-            <select name="role" value={formData.role} onChange={handleInputChange} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white mt-1">
+            <select name="role" value={formData.role} onChange={handleInputChange} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm dark:bg-neutral-900 dark:border-neutral-800 dark:text-white mt-1">
               <option value="admin">Admin</option>
               <option value="superadmin">Superadmin</option>
             </select>
@@ -262,7 +262,7 @@ export default function MentorAdminManagement() {
             <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleInputChange} id="isActiveAdd" className="accent-indigo-500" />
             <label htmlFor="isActiveAdd" className="text-sm dark:text-slate-300">Account Active</label>
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-700">
+          <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800">
             <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Create</Button>
           </div>
@@ -287,7 +287,7 @@ export default function MentorAdminManagement() {
             <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleInputChange} id="isActiveEdit" className="accent-indigo-500" />
             <label htmlFor="isActiveEdit" className="text-sm dark:text-slate-300">Account Active</label>
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-700">
+          <div className="flex justify-end gap-2 pt-4 border-t dark:border-neutral-800">
             <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">Save</Button>
           </div>
