@@ -301,3 +301,168 @@ export const funcoinTransactionCreateSchema = yup.object({
   referenceTitle: yup.string().trim().optional(),
   notes: yup.string().trim().max(500, 'Notes are too long').optional(),
 });
+
+// ----- admin: course coupons -----
+// Backend: CourseCouponCreateInput / CourseCouponUpdateInput.
+
+const discountTypeEnum = yup
+  .string()
+  .oneOf(['percent', 'flat'], 'Discount type must be percent or flat')
+  .required('Discount type is required');
+
+const optionalDate = yup
+  .string()
+  .trim()
+  .matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Use YYYY-MM-DD', excludeEmptyString: true })
+  .optional();
+
+export const couponCreateSchema = yup.object({
+  code: requiredString('Code').min(2).max(40),
+  title: yup.string().trim().max(120).optional(),
+  description: yup.string().trim().max(500).optional(),
+  discountType: discountTypeEnum,
+  discountValue: yup
+    .number()
+    .typeError('Discount value must be a number')
+    .positive('Discount value must be greater than 0')
+    .required('Discount value is required'),
+  maxDiscountInr: yup
+    .number()
+    .typeError('Max discount must be a number')
+    .min(0)
+    .nullable()
+    .transform((v, o) => (o === '' || o === null || o === undefined ? null : v)),
+  minOrderAmountInr: yup
+    .number()
+    .typeError('Minimum order amount must be a number')
+    .min(0)
+    .default(0),
+  perUserLimit: yup
+    .number()
+    .typeError('Per-user limit must be a number')
+    .integer()
+    .min(1)
+    .default(1),
+  usageLimit: yup
+    .number()
+    .typeError('Usage limit must be a number')
+    .integer()
+    .min(1)
+    .nullable()
+    .transform((v, o) => (o === '' || o === null || o === undefined ? null : v)),
+  applicableCourseIds: yup.array().of(yup.string().trim()).default([]),
+  validFrom: optionalDate,
+  validUntil: optionalDate,
+  isActive: yup.boolean().default(true),
+});
+
+export const couponUpdateSchema = couponCreateSchema
+  // For PATCH, the code is immutable server-side so we omit it.
+  .omit(['code'])
+  .shape({
+    discountType: yup.string().oneOf(['percent', 'flat']).optional(),
+    discountValue: yup
+      .number()
+      .typeError('Discount value must be a number')
+      .positive('Discount value must be greater than 0')
+      .optional(),
+  });
+
+// ----- admin: gamification -----
+// Backend: AdminMissionCreateInput / AdminMissionUpdateInput,
+// AdminChallengeCreateInput / AdminChallengeUpdateInput,
+// AdminBadgeCreateInput / AdminBadgeUpdateInput,
+// AdminTitleCreateInput / AdminTitleUpdateInput.
+
+export const missionCreateSchema = yup.object({
+  code: requiredString('Code').min(2),
+  title: requiredString('Title').min(2),
+  description: requiredString('Description').min(2),
+  missionType: yup
+    .string()
+    .oneOf(['daily', 'weekly', 'special'], 'Type must be daily, weekly, or special')
+    .required('Mission type is required'),
+  targetCount: yup
+    .number()
+    .typeError('Target count must be a number')
+    .integer()
+    .min(1)
+    .default(1),
+  rewardCoins: yup
+    .number()
+    .typeError('Reward must be a number')
+    .integer()
+    .min(0)
+    .default(0),
+  isActive: yup.boolean().default(true),
+});
+
+export const challengeCreateSchema = yup.object({
+  question: requiredString('Question').min(5),
+  optionsRaw: yup
+    .string()
+    .trim()
+    .required('Provide at least two options (one per line)'),
+  // `optionsRaw` is a textarea; we transform into an array for the server.
+  options: yup
+    .array()
+    .of(yup.string().trim().min(1))
+    .min(2, 'Provide at least two options')
+    .when('optionsRaw', ([raw], schema) =>
+      schema.transform(() =>
+        String(raw || '')
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    ),
+  correctOptionIndex: yup
+    .number()
+    .typeError('Correct option index must be a number')
+    .integer()
+    .min(0, 'Index must be 0 or greater')
+    .required('Correct option index is required'),
+  explanation: yup.string().trim().max(2000).optional(),
+  rewardCoins: yup
+    .number()
+    .typeError('Reward must be a number')
+    .integer()
+    .min(0)
+    .default(0),
+  isActive: yup.boolean().default(true),
+});
+
+export const badgeCreateSchema = yup.object({
+  code: requiredString('Code').min(2),
+  name: requiredString('Name').min(2),
+  description: yup.string().trim().max(500).optional(),
+  iconUrl: yup.string().trim().url('Enter a valid URL').optional(),
+  isActive: yup.boolean().default(true),
+});
+
+export const titleCreateSchema = yup.object({
+  code: requiredString('Code').min(2),
+  name: requiredString('Name').min(2),
+  description: yup.string().trim().max(500).optional(),
+  isActive: yup.boolean().default(true),
+});
+
+// ----- admin: notifications -----
+// Backend: AdminNotificationCreateInput.
+
+export const notificationCreateSchema = yup.object({
+  title: requiredString('Title').min(2).max(140),
+  body: requiredString('Body').min(2).max(1000),
+  target: yup
+    .string()
+    .oneOf(['all', 'user'], 'Pick a target')
+    .required('Target is required'),
+  userId: yup
+    .string()
+    .trim()
+    .when('target', {
+      is: 'user',
+      then: (s) => s.required('User ID is required for single-user send'),
+      otherwise: (s) => s.optional(),
+    }),
+});

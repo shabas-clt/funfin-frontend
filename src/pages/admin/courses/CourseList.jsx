@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Edit, Trash, Eye, Send, Archive } from 'lucide-react';
+import { Search, Edit, Trash, Eye, Send, Archive, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -165,6 +165,9 @@ export default function CourseList() {
                         <button onClick={() => navigate(`/admin/courses/${course.id}/edit`)} className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center" aria-label="Edit">
                           <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                         </button>
+                        <button onClick={() => navigate(`/admin/courses/${course.id}/progress`)} className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-900/40 flex items-center justify-center" aria-label="Progress">
+                          <BarChart3 className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
+                        </button>
                         <button onClick={() => handleDelete(course)} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center" aria-label="Delete">
                           <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                         </button>
@@ -224,6 +227,9 @@ export default function CourseList() {
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => navigate(`/admin/courses/${course.id}/edit`)} className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center justify-center" aria-label="View/Edit">
                             <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                          </button>
+                          <button onClick={() => navigate(`/admin/courses/${course.id}/progress`)} className="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-colors flex items-center justify-center" aria-label="Progress">
+                            <BarChart3 className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
                           </button>
                           <button
                             onClick={() => handlePublishToggle(course)}
