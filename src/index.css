@@ -78,12 +78,3 @@
   }
 }
 
-/* react-day-picker dark mode overrides */
-.dark .rdp {
-  --rdp-accent-color: #818cf8;
-  --rdp-background-color: #121212;
-  color: #e2e8f0;
-}
-.dark .rdp-day:hover:not([disabled]) {
-  background-color: #1f1f1f;
-}

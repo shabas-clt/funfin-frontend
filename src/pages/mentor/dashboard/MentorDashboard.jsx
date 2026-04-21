@@ -2,25 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
+import { formatShortDateTime } from '@/lib/format';
 
-const dummyPerformance = [
-  { label: 'Today Calls', value: 4 },
-  { label: 'This Week Calls', value: 16 },
-  { label: 'Hit Ratio', value: '71%' },
-  { label: 'Subscribers', value: 28 },
-];
-
-const formatDateTime = (value) => {
-  if (!value) return '-';
+const isToday = (value) => {
+  if (!value) return false;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate();
+};
+
+const isWithinLast7Days = (value) => {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return date.getTime() >= cutoff;
 };
 
 export default function MentorDashboard() {
@@ -53,6 +52,17 @@ export default function MentorDashboard() {
 
   const activeSignals = useMemo(() => signals.filter((row) => row.status === 'active'), [signals]);
 
+  const metrics = useMemo(() => {
+    const todayCount = signals.filter((s) => isToday(s.createdAt)).length;
+    const weekCount = signals.filter((s) => isWithinLast7Days(s.createdAt)).length;
+    return [
+      { label: 'Today Signals', value: todayCount },
+      { label: 'Last 7 Days', value: weekCount },
+      { label: 'Active Signals', value: activeSignals.length },
+      { label: 'Active Subscribers', value: subscribers.length },
+    ];
+  }, [signals, activeSignals.length, subscribers.length]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,12 +70,14 @@ export default function MentorDashboard() {
         <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Monitor your posted signals and active student subscriptions</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {dummyPerformance.map((metric) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {metrics.map((metric) => (
           <Card key={metric.label} className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
-            <CardContent className="p-5">
-              <p className="text-sm text-slate-500 dark:text-slate-400">{metric.label}</p>
-              <h3 className="text-[24px] font-bold text-slate-900 dark:text-white mt-2">{metric.value}</h3>
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{metric.label}</p>
+              <h3 className="text-[20px] sm:text-[24px] font-bold text-slate-900 dark:text-white mt-1 sm:mt-2">
+                {isLoading ? '—' : metric.value}
+              </h3>
             </CardContent>
           </Card>
         ))}
@@ -88,7 +100,7 @@ export default function MentorDashboard() {
                       <span className="text-xs text-slate-400">{signal.status}</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">Entry: {signal.entryPrice} | SL: {signal.stopLoss}</p>
-                    <p className="text-xs text-slate-500 mt-1">{formatDateTime(signal.createdAt)}</p>
+                    <p className="text-xs text-slate-500 mt-1">{formatShortDateTime(signal.createdAt)}</p>
                   </div>
                 ))}
               </div>

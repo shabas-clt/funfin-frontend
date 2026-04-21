@@ -1,22 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Trash, Eye, Download } from 'lucide-react';
+import { Search, Trash, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { FilterDropdown } from '@/components/ui/filter-dropdown';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import { formatShortDate } from '@/lib/format';
 
 const FILTER_OPTIONS = ['All', 'user', 'mentor'];
-
-const formatDate = (value) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
 
 const primaryRole = (roles) => {
   if (!Array.isArray(roles) || roles.length === 0) return 'user';
@@ -28,7 +20,6 @@ export default function StudentManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('');
-  const [dateRange, setDateRange] = useState(undefined);
 
   const fetchStudents = async () => {
     try {
@@ -43,7 +34,9 @@ export default function StudentManagement() {
     }
   };
 
-  useEffect(() => { fetchStudents(); }, []);
+  useEffect(() => {
+    fetchStudents();
+  }, []);
 
   const filtered = useMemo(() => {
     return students.filter((student) => {
@@ -51,9 +44,10 @@ export default function StudentManagement() {
       const matchesRole = !filterRole || role === filterRole;
       const fullName = student.fullName || '';
       const email = student.email || '';
+      const q = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery
-        || fullName.toLowerCase().includes(searchQuery.toLowerCase())
-        || email.toLowerCase().includes(searchQuery.toLowerCase());
+        || fullName.toLowerCase().includes(q)
+        || email.toLowerCase().includes(q);
       return matchesRole && matchesSearch;
     });
   }, [students, filterRole, searchQuery]);
@@ -77,33 +71,24 @@ export default function StudentManagement() {
       fetchStudents();
       toast.success('Student removed');
     } catch (error) {
-      toast.error(error?.detail || 'Failed to remove student');
+      toast.error(typeof error === 'string' ? error : 'Failed to remove student');
     }
   };
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Students</h1>
-          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Manage student accounts from backend</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 px-4 shadow-sm h-10">
-            <Download className="w-4 h-4" /> Export
-          </Button>
-          <Button
-            onClick={() => toast.info('Student creation is managed from client signup APIs')}
-            className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10"
-          >
-            + Add Student
-          </Button>
+          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">
+            Student accounts are created through client-side signup. Admins can review and remove them here.
+          </p>
         </div>
       </div>
 
       <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl overflow-hidden pb-4">
         <CardContent className="p-0">
-          <div className="p-5 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="p-4 sm:p-5 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
             <div className="relative w-full md:w-[340px]">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -116,19 +101,74 @@ export default function StudentManagement() {
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
               <FilterDropdown options={FILTER_OPTIONS} value={filterRole} onChange={setFilterRole} />
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
             </div>
           </div>
 
-          <div className="overflow-x-auto px-2">
+          {/* Phone (<md): card stack */}
+          <div className="md:hidden px-3 pb-3 space-y-2">
+            {isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No students found</p>
+            ) : filtered.map((student) => {
+              const role = primaryRole(student.roles);
+              const roleClass = role === 'mentor'
+                ? 'bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400'
+                : 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400';
+              return (
+                <div
+                  key={student.id}
+                  className="rounded-xl border border-slate-100 dark:border-neutral-800 p-3 flex items-center gap-3"
+                >
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(student.fullName || 'User')}&background=6366f1&color=fff&rounded=true`}
+                    alt="avatar"
+                    className="w-10 h-10 rounded-full shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      {student.fullName || 'Unknown User'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{student.email || '-'}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${roleClass}`}>{role}</span>
+                      <span className="text-[10px] text-slate-400">{formatShortDate(student.createdAt)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center"
+                      aria-label="View"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(student.id)}
+                      className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center"
+                      aria-label="Delete"
+                    >
+                      <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tablet and up: full table */}
+          <div className="hidden md:block overflow-x-auto px-2">
             <table className="w-full text-[13px] text-left whitespace-nowrap">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-neutral-800">
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Name</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
-                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Country</th>
+                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 hidden lg:table-cell">Country</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Role</th>
-                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Joined</th>
+                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 hidden lg:table-cell">Joined</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
@@ -150,7 +190,7 @@ export default function StudentManagement() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <img
-                            src={`https://ui-avatars.com/api/?name=${student.fullName || 'User'}&background=6366f1&color=fff&rounded=true`}
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(student.fullName || 'User')}&background=6366f1&color=fff&rounded=true`}
                             alt="avatar"
                             className="w-9 h-9 rounded-full shadow-sm"
                           />
@@ -161,17 +201,24 @@ export default function StudentManagement() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">{student.email || '-'}</td>
-                      <td className="px-5 py-3.5">{student.country || '-'}</td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell">{student.country || '-'}</td>
                       <td className="px-5 py-3.5">
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${roleClass}`}>{role}</span>
                       </td>
-                      <td className="px-5 py-3.5">{formatDate(student.createdAt)}</td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell">{formatShortDate(student.createdAt)}</td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center justify-center">
+                          <button
+                            className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center justify-center"
+                            aria-label="View"
+                          >
                             <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                           </button>
-                          <button onClick={() => handleDelete(student.id)} className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center">
+                          <button
+                            onClick={() => handleDelete(student.id)}
+                            className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center"
+                            aria-label="Delete"
+                          >
                             <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                           </button>
                         </div>

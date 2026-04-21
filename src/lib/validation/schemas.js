@@ -101,14 +101,82 @@ export const mentorUpdateSchema = yup.object({
   isActive: yup.boolean().optional(),
 });
 
-// Course-management schemas intentionally omitted here.
+// ----- admin: course management -----
+// Backend: CourseCreate / CourseUpdate (see app/schemas/course.py).
 //
-// The course-management page gets a full overhaul in slice 5 (direct R2
-// video uploads, modules, videos, draft/publish state, computed funcoin
-// price), and the current form will be replaced rather than extended.
-// Defining a transitional schema now would be throwaway work whose rules
-// don't match either the current form or the redesigned one; slice 5 will
-// add the correct schemas here in one step.
+// Notes that are easy to miss if you glance at the backend file:
+// - `state` is deliberately NOT part of create/update; it flips through
+//   dedicated publish/unpublish endpoints.
+// - `priceFuncoins` is derived at purchase time from the live rate, not
+//   sent from the admin.
+// - `duration`, `totalModules` were removed from the admin payload; they
+//   are now derived server-side from topic rows.
+// - `photo` or `videoUrl` must be present. We enforce this with a cross-
+//   field test so the admin gets a single, clear error.
+
+const levelEnum = ['beginner', 'intermediate', 'advanced'];
+
+const tagsField = yup
+  .array()
+  .of(
+    yup
+      .string()
+      .trim()
+      .lowercase()
+      .max(30, 'Each tag must be 30 characters or fewer')
+  )
+  .max(20, 'Up to 20 tags allowed')
+  .transform((value, original) => {
+    if (Array.isArray(value)) return value;
+    if (typeof original !== 'string') return value;
+    return original
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+  })
+  .optional();
+
+export const courseCreateSchema = yup.object({
+  title: requiredString('Title').min(2).max(140),
+  description: requiredString('Description').min(10),
+  priceInr: yup
+    .number()
+    .typeError('Price must be a number')
+    .min(0, 'Price cannot be negative')
+    .required('Price is required'),
+  photo: yup.string().trim().optional(),
+  videoUrl: yup.string().trim().optional(),
+  level: yup.string().oneOf(levelEnum, 'Invalid level').default('beginner'),
+  language: yup.string().trim().max(40).optional(),
+  tags: tagsField,
+}).test(
+  'photo-or-video',
+  'Upload a cover image or a trailer video',
+  (values) => Boolean(values?.photo) || Boolean(values?.videoUrl)
+);
+
+export const courseUpdateSchema = yup.object({
+  title: yup.string().trim().min(2).max(140).optional(),
+  description: yup.string().trim().min(10).optional(),
+  priceInr: yup
+    .number()
+    .typeError('Price must be a number')
+    .min(0, 'Price cannot be negative')
+    .optional(),
+  photo: yup.string().trim().optional(),
+  videoUrl: yup.string().trim().optional(),
+  level: yup.string().oneOf(levelEnum, 'Invalid level').optional(),
+  language: yup.string().trim().max(40).optional(),
+  tags: tagsField,
+});
+
+// Note: syllabus (module) and topic (video) create/update payloads are
+// validated inline in SyllabusEditor since those rows are added through
+// several small, context-dependent forms rather than one monolithic form.
+// If we ever consolidate them, the rules to enforce are:
+//   - module: title >= 2 chars, moduleLabel required, coverImage optional URL.
+//   - topic: title >= 2 chars, overview >= 10 chars, videoUrl required,
+//     order and durationSec non-negative integers.
 
 // ----- mentor: signals -----
 // Backend: TradingSignalCreateInput (see app/schemas/signal.py).
