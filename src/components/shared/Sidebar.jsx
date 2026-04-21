@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
-  Radio, X,
+  Radio, X, Coins,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
@@ -14,6 +14,8 @@ const adminMenus = [
   { name: 'Mentors', path: '/admin/mentors', icon: Radio },
   { name: 'Students', path: '/admin/students', icon: GraduationCap },
   { name: 'Courses', path: '/admin/courses', icon: BookOpen },
+  { header: 'Commerce' },
+  { name: 'FunCoin', path: '/admin/funcoin', icon: Coins },
 ];
 
 const mentorMenus = [

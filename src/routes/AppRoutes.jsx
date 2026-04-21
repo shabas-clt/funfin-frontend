@@ -9,6 +9,7 @@ import CourseEditor from '../pages/admin/courses/CourseEditor';
 import StudentManagement from '../pages/admin/students/StudentManagement';
 import AdminManagement from '../pages/admin/admins/AdminManagement';
 import MentorManagement from '../pages/admin/mentors/MentorManagement';
+import FuncoinManagement from '../pages/admin/funcoin/FuncoinManagement';
 import MentorDashboard from '../pages/mentor/dashboard/MentorDashboard';
 import MentorSignals from '../pages/mentor/signals/MentorSignals';
 import SignIn from '../pages/auth/SignIn';
@@ -33,6 +34,7 @@ const AppRoutes = () => {
             <Route path="students" element={<PageTransition><StudentManagement /></PageTransition>} />
             <Route path="admins" element={<PageTransition><AdminManagement /></PageTransition>} />
             <Route path="mentors" element={<PageTransition><MentorManagement /></PageTransition>} />
+            <Route path="funcoin" element={<PageTransition><FuncoinManagement /></PageTransition>} />
           </Route>
         </Route>
 

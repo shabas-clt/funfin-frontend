@@ -234,3 +234,70 @@ export const signalCreateSchema = yup.object({
   rationale: yup.string().trim().max(2000).optional(),
   validUntil: yup.string().trim().optional(),
 });
+
+// ----- admin: funcoin pricing -----
+// Backend: FuncoinAdminPriceUpdate (see app/schemas/funcoin.py).
+
+export const funcoinPriceSchema = yup.object({
+  pricePerCoin: yup
+    .number()
+    .typeError('Price must be a number')
+    .positive('Price must be greater than 0')
+    .required('Price is required'),
+  note: yup.string().trim().max(200, 'Note is too long').optional(),
+});
+
+// ----- admin: funcoin category -----
+// Backend: FuncoinCategoryCreate / FuncoinCategoryUpdate.
+
+const kindEnum = yup
+  .string()
+  .oneOf(['earn', 'spend'], 'Kind must be earn or spend')
+  .required('Kind is required');
+
+export const funcoinCategoryCreateSchema = yup.object({
+  code: requiredString('Code').min(2, 'Code is too short'),
+  name: requiredString('Name').min(2, 'Name is too short'),
+  kind: kindEnum,
+  description: yup.string().trim().optional(),
+  isActive: yup.boolean().default(true),
+  sortOrder: yup
+    .number()
+    .typeError('Sort order must be a number')
+    .integer()
+    .min(0)
+    .default(0),
+});
+
+export const funcoinCategoryUpdateSchema = yup.object({
+  name: yup.string().trim().min(2, 'Name is too short').optional(),
+  kind: yup.string().oneOf(['earn', 'spend']).optional(),
+  description: yup.string().trim().optional(),
+  isActive: yup.boolean().optional(),
+  sortOrder: yup
+    .number()
+    .typeError('Sort order must be a number')
+    .integer()
+    .min(0)
+    .optional(),
+});
+
+// ----- admin: funcoin transaction (manual ledger entry) -----
+// Backend: FuncoinTransactionCreate. Admin picks a user, kind (earn/spend),
+// category code and coin amount; the other fields are optional metadata.
+
+export const funcoinTransactionCreateSchema = yup.object({
+  userId: requiredString('User'),
+  kind: kindEnum,
+  categoryCode: requiredString('Category'),
+  coins: yup
+    .number()
+    .typeError('Coins must be a number')
+    .integer('Coins must be whole')
+    .positive('Coins must be greater than 0')
+    .required('Coins are required'),
+  referenceType: yup.string().trim().optional(),
+  referenceId: yup.string().trim().optional(),
+  referenceTitle: yup.string().trim().optional(),
+  notes: yup.string().trim().max(500, 'Notes are too long').optional(),
+});
