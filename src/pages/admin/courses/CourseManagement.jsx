@@ -1,31 +1,23 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Edit, Trash, Eye, Download } from 'lucide-react';
+import { Search, Edit, Trash, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { FilterDropdown } from '@/components/ui/filter-dropdown';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import { formatShortDate } from '@/lib/format';
 
 const FILTER_OPTIONS = ['All', 'Published', 'Draft'];
-
-const formatDate = (value) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
 
 export default function CourseManagement() {
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [dateRange, setDateRange] = useState(undefined);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -182,10 +174,7 @@ export default function CourseManagement() {
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Manage courses from backend API</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 px-4 shadow-sm h-10">
-            <Download className="w-4 h-4" /> Export
-          </Button>
-          <Button onClick={openAddModal} className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10">
+          <Button onClick={openAddModal} className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10 w-full sm:w-auto justify-center">
             + Add Course
           </Button>
         </div>
@@ -193,7 +182,7 @@ export default function CourseManagement() {
 
       <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl overflow-hidden pb-4">
         <CardContent className="p-0">
-          <div className="p-5 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="p-4 sm:p-5 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
             <div className="relative w-full md:w-[340px]">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -206,11 +195,54 @@ export default function CourseManagement() {
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
               <FilterDropdown options={FILTER_OPTIONS} value={filterStatus} onChange={setFilterStatus} />
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
             </div>
           </div>
 
-          <div className="overflow-x-auto px-2">
+          {/* Phone (<md): card stack */}
+          <div className="md:hidden px-3 pb-3 space-y-2">
+            {isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-24 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : filteredCourses.length === 0 ? (
+              <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No courses match your filter</p>
+            ) : filteredCourses.map((course) => {
+              const statusText = course.isPublished ? 'Published' : 'Draft';
+              const badgeClass = statusText === 'Published'
+                ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+                : 'bg-amber-100/70 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400';
+              return (
+                <div key={course.id} className="rounded-xl border border-slate-100 dark:border-neutral-800 p-3 flex gap-3">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-neutral-900">
+                    {course.photo ? (
+                      <img src={course.photo} alt="" className="w-full h-full object-cover" />
+                    ) : null}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{course.title}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      ₹{course.priceInr} · {course.totalModules} mods
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeClass}`}>{statusText}</span>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEditModal(course)} className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center" aria-label="Edit">
+                          <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                        </button>
+                        <button onClick={() => handleDelete(course.id)} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center" aria-label="Delete">
+                          <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto px-2">
             <table className="w-full text-[13px] text-left whitespace-nowrap">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-neutral-800 text-slate-900 dark:text-slate-200">
@@ -249,7 +281,7 @@ export default function CourseManagement() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5">{formatDate(course.createdAt)}</td>
+                      <td className="px-5 py-3.5">{formatShortDate(course.createdAt)}</td>
                       <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">₹{course.priceInr}</td>
                       <td className="px-5 py-3.5">{course.totalModules}</td>
                       <td className="px-5 py-3.5">{course.duration}</td>

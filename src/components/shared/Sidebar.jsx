@@ -81,7 +81,7 @@ const Sidebar = ({ isOpen, setIsOpen, role = 'admin' }) => {
                 <NavLink
                   key={index}
                   to={item.path}
-                  onClick={(e) => {
+                  onClick={() => {
                     if (window.innerWidth < 1024) setIsOpen(false);
                   }}
                   className={cn(

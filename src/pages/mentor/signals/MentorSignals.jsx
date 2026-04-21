@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { signalCreateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
+import { formatShortDateTime } from '@/lib/format';
 
 const INITIAL_FORM = {
   headline: '',
@@ -24,19 +25,6 @@ const INITIAL_FORM = {
   confidence: 3,
   rationale: '',
   validUntil: '',
-};
-
-const formatDateTime = (value) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 };
 
 function FieldError({ error }) {
@@ -242,7 +230,7 @@ export default function MentorSignals() {
                       {signal.instrument} ({signal.direction?.toUpperCase()}) | Entry: {signal.entryPrice} | SL: {signal.stopLoss}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">Targets: {(signal.targetPrices || []).join(', ')}</p>
-                    <p className="text-xs text-slate-500 mt-1">Created: {formatDateTime(signal.createdAt)}</p>
+                    <p className="text-xs text-slate-500 mt-1">Created: {formatShortDateTime(signal.createdAt)}</p>
                   </div>
                 ))}
               </div>
@@ -263,7 +251,7 @@ export default function MentorSignals() {
                   <div key={student.userId} className="p-2.5 rounded-lg bg-slate-50 dark:bg-neutral-900">
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{student.fullName}</p>
                     <p className="text-xs text-slate-500">{student.email}</p>
-                    <p className="text-xs text-slate-500 mt-1">Ends: {formatDateTime(student.endsAt)}</p>
+                    <p className="text-xs text-slate-500 mt-1">Ends: {formatShortDateTime(student.endsAt)}</p>
                   </div>
                 ))}
               </div>
