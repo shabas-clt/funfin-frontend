@@ -4,7 +4,8 @@ import ProtectedRoute from './ProtectedRoute';
 import AdminLayout from '../layouts/AdminLayout';
 import MentorLayout from '../layouts/MentorLayout';
 import Dashboard from '../pages/admin/dashboard/Dashboard';
-import CourseManagement from '../pages/admin/courses/CourseManagement';
+import CourseList from '../pages/admin/courses/CourseList';
+import CourseEditor from '../pages/admin/courses/CourseEditor';
 import StudentManagement from '../pages/admin/students/StudentManagement';
 import AdminManagement from '../pages/admin/admins/AdminManagement';
 import MentorManagement from '../pages/admin/mentors/MentorManagement';
@@ -26,7 +27,9 @@ const AppRoutes = () => {
         <Route element={<ProtectedRoute allowedRoles={['admin', 'superadmin']} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route path="dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
-            <Route path="courses" element={<PageTransition><CourseManagement /></PageTransition>} />
+            <Route path="courses" element={<PageTransition><CourseList /></PageTransition>} />
+            <Route path="courses/new" element={<PageTransition><CourseEditor /></PageTransition>} />
+            <Route path="courses/:id/edit" element={<PageTransition><CourseEditor /></PageTransition>} />
             <Route path="students" element={<PageTransition><StudentManagement /></PageTransition>} />
             <Route path="admins" element={<PageTransition><AdminManagement /></PageTransition>} />
             <Route path="mentors" element={<PageTransition><MentorManagement /></PageTransition>} />
