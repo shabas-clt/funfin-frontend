@@ -30,6 +30,7 @@ function EditRow({ category, onSaved, onCancel }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(funcoinCategoryUpdateSchema),
+    mode: 'onChange',
     defaultValues: {
       name: category.name,
       kind: category.kind,
@@ -142,6 +143,7 @@ function CreateForm({ onCreated }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(funcoinCategoryCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       code: '',
       name: '',

@@ -21,6 +21,7 @@ export default function NotificationBroadcast() {
     formState: { errors },
   } = useForm({
     resolver: yupResolver(notificationCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       title: '',
       body: '',
@@ -49,11 +50,25 @@ export default function NotificationBroadcast() {
 
     setSending(true);
     try {
+      let resolvedUserId = values.userId?.trim();
+      if (values.target === 'user' && resolvedUserId?.includes('@')) {
+        const usersRes = await api.get('/students');
+        const match = (usersRes.students || []).find(
+          (u) => String(u.email || '').toLowerCase() === resolvedUserId.toLowerCase(),
+        );
+        if (!match?.id) {
+          toast.error('No user found with that email');
+          setSending(false);
+          return;
+        }
+        resolvedUserId = match.id;
+      }
+
       const payload = {
         title: values.title.trim(),
         body: values.body.trim(),
       };
-      if (values.target === 'user') payload.userId = values.userId.trim();
+      if (values.target === 'user') payload.userId = resolvedUserId;
       const res = await api.post('/admin/notifications', payload);
       toast.success(res?.message || 'Notification sent');
       setHistory((prev) =>
@@ -143,10 +158,13 @@ export default function NotificationBroadcast() {
                 </label>
                 <input
                   {...register('userId')}
-                  placeholder="e.g. 64fa12b4..."
+                  placeholder="MongoDB user ID or exact email"
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm font-mono"
                 />
                 <FieldError error={errors.userId} />
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  You can paste a user ID directly or provide a user email to auto-resolve.
+                </p>
               </div>
             )}
 

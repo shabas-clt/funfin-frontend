@@ -21,6 +21,7 @@ function CreateForm({ categories, onCreated }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(funcoinTransactionCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       userId: '',
       kind: 'earn',
