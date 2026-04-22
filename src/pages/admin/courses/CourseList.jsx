@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, Edit, Trash, Eye, Send, Archive, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,8 @@ const normalizeState = (course) => {
 
 export default function CourseList() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/mentor') ? '/mentor' : '/admin';
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,7 +114,7 @@ export default function CourseList() {
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Create, publish, and manage course catalogue</p>
         </div>
         <Button
-          onClick={() => navigate('/admin/courses/new')}
+          onClick={() => navigate(`${basePath}/courses/new`)}
           className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10 w-full sm:w-auto justify-center"
         >
           + New Course
@@ -162,10 +164,10 @@ export default function CourseList() {
                     <div className="flex items-center justify-between mt-2">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${stateBadgeClass(state)}`}>{state}</span>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => navigate(`/admin/courses/${course.id}/edit`)} className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center" aria-label="Edit">
+                        <button onClick={() => navigate(`${basePath}/courses/${course.id}/edit`)} className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center" aria-label="Edit">
                           <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                         </button>
-                        <button onClick={() => navigate(`/admin/courses/${course.id}/progress`)} className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-900/40 flex items-center justify-center" aria-label="Progress">
+                        <button onClick={() => navigate(`${basePath}/courses/${course.id}/progress`)} className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-900/40 flex items-center justify-center" aria-label="Progress">
                           <BarChart3 className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
                         </button>
                         <button onClick={() => handleDelete(course)} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center" aria-label="Delete">
@@ -225,10 +227,10 @@ export default function CourseList() {
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => navigate(`/admin/courses/${course.id}/edit`)} className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center justify-center" aria-label="View/Edit">
+                          <button onClick={() => navigate(`${basePath}/courses/${course.id}/edit`)} className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center justify-center" aria-label="View/Edit">
                             <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                           </button>
-                          <button onClick={() => navigate(`/admin/courses/${course.id}/progress`)} className="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-colors flex items-center justify-center" aria-label="Progress">
+                          <button onClick={() => navigate(`${basePath}/courses/${course.id}/progress`)} className="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-colors flex items-center justify-center" aria-label="Progress">
                             <BarChart3 className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
                           </button>
                           <button

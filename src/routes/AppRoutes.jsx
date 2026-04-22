@@ -51,6 +51,10 @@ const AppRoutes = () => {
         <Route element={<ProtectedRoute allowedRoles={['mentor']} />}>
           <Route path="/mentor" element={<MentorLayout />}>
             <Route path="dashboard" element={<PageTransition><MentorDashboard /></PageTransition>} />
+            <Route path="courses" element={<PageTransition><CourseList /></PageTransition>} />
+            <Route path="courses/new" element={<PageTransition><CourseEditor /></PageTransition>} />
+            <Route path="courses/:id/edit" element={<PageTransition><CourseEditor /></PageTransition>} />
+            <Route path="courses/:id/progress" element={<PageTransition><CourseProgress /></PageTransition>} />
             <Route path="signals" element={<PageTransition><MentorSignals /></PageTransition>} />
           </Route>
         </Route>
