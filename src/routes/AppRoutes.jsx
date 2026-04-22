@@ -43,6 +43,7 @@ const AppRoutes = () => {
             <Route path="coupons" element={<PageTransition><CouponManagement /></PageTransition>} />
             <Route path="gamification" element={<PageTransition><GamificationManagement /></PageTransition>} />
             <Route path="notifications" element={<PageTransition><NotificationBroadcast /></PageTransition>} />
+            <Route path="signals" element={<PageTransition><MentorSignals /></PageTransition>} />
           </Route>
         </Route>
 
