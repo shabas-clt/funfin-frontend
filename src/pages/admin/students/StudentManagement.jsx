@@ -1,14 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Trash, Eye } from 'lucide-react';
+import { Search, Trash, Eye, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { FilterDropdown } from '@/components/ui/filter-dropdown';
+import { Modal } from '@/components/ui/modal';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { formatShortDate } from '@/lib/format';
 
 const FILTER_OPTIONS = ['All', 'user', 'mentor'];
+const PAGE_SIZE = 12;
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'name-asc', label: 'Name A-Z' },
+  { value: 'name-desc', label: 'Name Z-A' },
+];
 
 const primaryRole = (roles) => {
   if (!Array.isArray(roles) || roles.length === 0) return 'user';
@@ -20,6 +28,9 @@ export default function StudentManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [page, setPage] = useState(1);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   const fetchStudents = async () => {
     try {
@@ -39,7 +50,7 @@ export default function StudentManagement() {
   }, []);
 
   const filtered = useMemo(() => {
-    return students.filter((student) => {
+    const rows = students.filter((student) => {
       const role = primaryRole(student.roles);
       const matchesRole = !filterRole || role === filterRole;
       const fullName = student.fullName || '';
@@ -50,7 +61,28 @@ export default function StudentManagement() {
         || email.toLowerCase().includes(q);
       return matchesRole && matchesSearch;
     });
-  }, [students, filterRole, searchQuery]);
+
+    rows.sort((a, b) => {
+      if (sortBy === 'name-asc') return (a.fullName || '').localeCompare(b.fullName || '');
+      if (sortBy === 'name-desc') return (b.fullName || '').localeCompare(a.fullName || '');
+      const ad = new Date(a.createdAt || 0).getTime();
+      const bd = new Date(b.createdAt || 0).getTime();
+      return sortBy === 'oldest' ? ad - bd : bd - ad;
+    });
+
+    return rows;
+  }, [students, filterRole, searchQuery, sortBy]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filterRole, sortBy]);
 
   const handleDelete = async (id) => {
     const result = await Swal.fire({
@@ -81,7 +113,7 @@ export default function StudentManagement() {
         <div>
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Students</h1>
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">
-            Student accounts are created through client-side signup. Admins can review and remove them here.
+            Student accounts are created through client-side signup. Admins can review, inspect, and remove them here.
           </p>
         </div>
       </div>
@@ -101,10 +133,21 @@ export default function StudentManagement() {
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
               <FilterDropdown options={FILTER_OPTIONS} value={filterRole} onChange={setFilterRole} />
+              <div className="relative">
+                <ArrowUpDown className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="h-9 pl-8 pr-3 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-slate-700 dark:text-slate-200"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Phone (<md): card stack */}
           <div className="md:hidden px-3 pb-3 space-y-2">
             {isLoading ? (
               <div className="space-y-2">
@@ -112,9 +155,9 @@ export default function StudentManagement() {
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : paged.length === 0 ? (
               <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No students found</p>
-            ) : filtered.map((student) => {
+            ) : paged.map((student) => {
               const role = primaryRole(student.roles);
               const roleClass = role === 'mentor'
                 ? 'bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400'
@@ -141,6 +184,7 @@ export default function StudentManagement() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
+                      onClick={() => setSelectedStudent(student)}
                       className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center"
                       aria-label="View"
                     >
@@ -159,7 +203,6 @@ export default function StudentManagement() {
             })}
           </div>
 
-          {/* Tablet and up: full table */}
           <div className="hidden md:block overflow-x-auto px-2">
             <table className="w-full text-[13px] text-left whitespace-nowrap">
               <thead>
@@ -175,11 +218,11 @@ export default function StudentManagement() {
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={6} cols={6} />
-                ) : filtered.length === 0 ? (
+                ) : paged.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-10 text-center text-slate-400 dark:text-slate-500">No students found</td>
                   </tr>
-                ) : filtered.map((student) => {
+                ) : paged.map((student) => {
                   const role = primaryRole(student.roles);
                   const roleClass = role === 'mentor'
                     ? 'bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400'
@@ -209,6 +252,7 @@ export default function StudentManagement() {
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => setSelectedStudent(student)}
                             className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors flex items-center justify-center"
                             aria-label="View"
                           >
@@ -229,8 +273,47 @@ export default function StudentManagement() {
               </tbody>
             </table>
           </div>
+
+          {!isLoading && filtered.length > PAGE_SIZE && (
+            <div className="px-5 pt-2 flex items-center justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{currentPage} / {pageCount}</span>
+                <button
+                  type="button"
+                  disabled={currentPage >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <Modal isOpen={Boolean(selectedStudent)} onClose={() => setSelectedStudent(null)} title="Student Details">
+        <div className="space-y-2 text-sm">
+          <p><span className="font-semibold">Full Name:</span> {selectedStudent?.fullName || '-'}</p>
+          <p><span className="font-semibold">Email:</span> {selectedStudent?.email || '-'}</p>
+          <p><span className="font-semibold">Phone:</span> {selectedStudent?.phone || '-'}</p>
+          <p><span className="font-semibold">Country:</span> {selectedStudent?.country || '-'}</p>
+          <p><span className="font-semibold">Role:</span> {primaryRole(selectedStudent?.roles)}</p>
+          <p><span className="font-semibold">Joined:</span> {formatShortDate(selectedStudent?.createdAt)}</p>
+          <p><span className="font-semibold">User ID:</span> <span className="font-mono text-xs">{selectedStudent?.id || '-'}</span></p>
+        </div>
+      </Modal>
     </div>
   );
 }

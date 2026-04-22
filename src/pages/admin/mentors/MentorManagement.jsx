@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Edit, Trash, Eye } from 'lucide-react';
+import { Search, Edit, Trash, Eye, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,22 +14,20 @@ import Swal from 'sweetalert2';
 import { mentorCreateSchema, mentorUpdateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
 import { formatShortDate } from '@/lib/format';
+import FieldError from '@/components/shared/FieldError';
 
 const STATUS_FILTER_OPTIONS = ['All', 'Active', 'Inactive'];
 
 const ADD_DEFAULTS = { fullName: '', email: '', password: '', isActive: true };
 const EDIT_DEFAULTS = { fullName: '', email: '', password: '', isActive: true };
-
-function FieldError({ error }) {
-  if (!error?.message) return null;
-  return <p className="mt-1 text-xs text-rose-500 dark:text-rose-400">{error.message}</p>;
-}
+const PAGE_SIZE = 12;
 
 export default function MentorManagement() {
   const [mentors, setMentors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [page, setPage] = useState(1);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -38,12 +36,12 @@ export default function MentorManagement() {
 
   const addForm = useForm({
     resolver: yupResolver(mentorCreateSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: ADD_DEFAULTS,
   });
   const editForm = useForm({
     resolver: yupResolver(mentorUpdateSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: EDIT_DEFAULTS,
   });
 
@@ -75,6 +73,17 @@ export default function MentorManagement() {
       return matchesStatus && matchesSearch;
     });
   }, [mentors, filterStatus, searchQuery]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filterStatus]);
 
   const openAddModal = () => {
     addForm.reset(ADD_DEFAULTS);
@@ -182,7 +191,7 @@ export default function MentorManagement() {
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Admins and superadmins can add, edit, view, and delete mentor accounts</p>
         </div>
         <Button onClick={openAddModal} className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10 w-full sm:w-auto justify-center">
-          + Add Mentor
+          <Plus className="w-4 h-4" /> Add Mentor
         </Button>
       </div>
 
@@ -212,9 +221,9 @@ export default function MentorManagement() {
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : paged.length === 0 ? (
               <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No mentors found</p>
-            ) : filtered.map((person) => {
+            ) : paged.map((person) => {
               const badgeClass = person.isActive
                 ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
                 : 'bg-rose-100/70 text-rose-500 dark:bg-rose-900/40 dark:text-rose-400';
@@ -259,11 +268,11 @@ export default function MentorManagement() {
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={5} cols={5} />
-                ) : filtered.length === 0 ? (
+                ) : paged.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-10 text-center text-slate-400 dark:text-slate-500">No mentors found</td>
                   </tr>
-                ) : filtered.map((person) => {
+                ) : paged.map((person) => {
                   const statusText = person.isActive ? 'Active' : 'Inactive';
                   const badgeClass = person.isActive
                     ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
@@ -308,6 +317,32 @@ export default function MentorManagement() {
               </tbody>
             </table>
           </div>
+          {!isLoading && filtered.length > PAGE_SIZE && (
+            <div className="px-5 pt-2 flex items-center justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{currentPage} / {pageCount}</span>
+                <button
+                  type="button"
+                  disabled={currentPage >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

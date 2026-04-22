@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Edit, Trash, Eye, KeyRound } from 'lucide-react';
+import { Search, Edit, Trash, Eye, KeyRound, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { adminCreateSchema, adminUpdateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
 import { formatShortDate } from '@/lib/format';
+import FieldError from '@/components/shared/FieldError';
 
 const ROLE_FILTER_OPTIONS = ['All', 'admin', 'superadmin'];
 
@@ -33,15 +34,14 @@ const EDIT_DEFAULTS = {
   isActive: true,
   password: '',
 };
+const PAGE_SIZE = 12;
 
-// Field-level error text. Keeps the JSX visually consistent with the rest
-// of the admin panel.
-function FieldError({ error }) {
-  if (!error?.message) return null;
-  return (
-    <p className="mt-1 text-xs text-rose-500 dark:text-rose-400">{error.message}</p>
-  );
-}
+const SORT_OPTIONS = [
+  { value: 'createdAt:desc', label: 'Newest first' },
+  { value: 'createdAt:asc', label: 'Oldest first' },
+  { value: 'name:asc', label: 'Name A-Z' },
+  { value: 'name:desc', label: 'Name Z-A' },
+];
 
 export default function AdminManagement() {
   const { admin: currentAdmin } = useAuth();
@@ -53,6 +53,7 @@ export default function AdminManagement() {
   const [filterRole, setFilterRole] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -63,12 +64,12 @@ export default function AdminManagement() {
   // both modals are briefly open during a transition.
   const addForm = useForm({
     resolver: yupResolver(adminCreateSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: ADD_DEFAULTS,
   });
   const editForm = useForm({
     resolver: yupResolver(adminUpdateSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: EDIT_DEFAULTS,
   });
 
@@ -104,6 +105,17 @@ export default function AdminManagement() {
       return (person.fullName || '').toLowerCase().includes(q) || (person.email || '').toLowerCase().includes(q);
     });
   }, [admins, searchQuery]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, filterRole, sortBy, sortOrder]);
 
   const onSearchSubmit = (e) => {
     e.preventDefault();
@@ -263,7 +275,7 @@ export default function AdminManagement() {
         </div>
         {isSuperAdmin ? (
           <Button onClick={openAddModal} className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10 w-full sm:w-auto justify-center">
-            + Add Admin
+            <Plus className="w-4 h-4" /> Add Admin
           </Button>
         ) : null}
       </div>
@@ -285,20 +297,17 @@ export default function AdminManagement() {
             <div className="flex items-center gap-2 w-full lg:w-auto flex-wrap">
               <FilterDropdown options={ROLE_FILTER_OPTIONS} value={filterRole} onChange={setFilterRole} />
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
+                value={`${sortBy}:${sortOrder}`}
+                onChange={(e) => {
+                  const [by, order] = e.target.value.split(':');
+                  setSortBy(by);
+                  setSortOrder(order);
+                }}
+                className="h-10 px-3 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-slate-700 dark:text-slate-200"
               >
-                <option value="name">Sort: Name</option>
-                <option value="createdAt">Sort: Join Date</option>
-              </select>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                className="h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm"
-              >
-                <option value="asc">Ascending</option>
-                <option value="desc">Descending</option>
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -311,9 +320,9 @@ export default function AdminManagement() {
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : paged.length === 0 ? (
               <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No admins match your filter</p>
-            ) : filtered.map((person) => {
+            ) : paged.map((person) => {
               const badgeClass = person.isActive
                 ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
                 : 'bg-rose-100/70 text-rose-500 dark:bg-rose-900/40 dark:text-rose-400';
@@ -362,11 +371,11 @@ export default function AdminManagement() {
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={5} cols={6} />
-                ) : filtered.length === 0 ? (
+                ) : paged.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-10 text-center text-slate-400 dark:text-slate-500">No admins match your filter</td>
                   </tr>
-                ) : filtered.map((person) => {
+                ) : paged.map((person) => {
                   const statusText = person.isActive ? 'Active' : 'Inactive';
                   const badgeClass = person.isActive
                     ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
@@ -419,6 +428,32 @@ export default function AdminManagement() {
               </tbody>
             </table>
           </div>
+          {!isLoading && filtered.length > PAGE_SIZE && (
+            <div className="px-5 pt-2 flex items-center justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{currentPage} / {pageCount}</span>
+                <button
+                  type="button"
+                  disabled={currentPage >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

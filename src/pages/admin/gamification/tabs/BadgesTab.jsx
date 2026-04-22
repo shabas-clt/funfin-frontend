@@ -16,6 +16,7 @@ function CreateForm({ onCreated }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(badgeCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       code: '',
       name: '',

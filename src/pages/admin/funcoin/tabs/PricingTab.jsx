@@ -26,6 +26,7 @@ export default function PricingTab() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(funcoinPriceSchema),
+    mode: 'onChange',
     defaultValues: { pricePerCoin: '', note: '' },
   });
 

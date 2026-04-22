@@ -11,6 +11,7 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import ImageUploader from '@/components/shared/ImageUploader';
 import VideoUploader from '@/components/shared/VideoUploader';
+import FieldError from '@/components/shared/FieldError';
 import SyllabusEditor from './SyllabusEditor';
 import { courseCreateSchema, courseUpdateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
@@ -33,11 +34,6 @@ const CREATE_DEFAULTS = {
   language: '',
   tags: [],
 };
-
-function FieldError({ error }) {
-  if (!error?.message) return null;
-  return <p className="mt-1 text-xs text-rose-500 dark:text-rose-400">{error.message}</p>;
-}
 
 // The funcoin price is derived at purchase time from the live rate, but we
 // surface a *live preview* here so the admin knows roughly what students
@@ -66,7 +62,7 @@ export default function CourseEditor() {
 
   const form = useForm({
     resolver: yupResolver(isEdit ? courseUpdateSchema : courseCreateSchema),
-    mode: 'onBlur',
+    mode: 'onChange',
     defaultValues: CREATE_DEFAULTS,
   });
   const {

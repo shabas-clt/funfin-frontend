@@ -32,6 +32,7 @@ function CreateForm({ onCreated }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(missionCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       code: '',
       title: '',

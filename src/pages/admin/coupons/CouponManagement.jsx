@@ -67,6 +67,7 @@ function CreateForm({ onCreated }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(couponCreateSchema),
+    mode: 'onChange',
     defaultValues: {
       code: '',
       title: '',
@@ -275,6 +276,7 @@ function EditDialog({ coupon, onSaved, onCancel }) {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: yupResolver(couponUpdateSchema),
+    mode: 'onChange',
     defaultValues: {
       title: coupon.title || '',
       description: coupon.description || '',
