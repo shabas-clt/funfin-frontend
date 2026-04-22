@@ -26,6 +26,7 @@ const adminMenus = [
 const mentorMenus = [
   { header: 'Mentor Panel' },
   { name: 'Dashboard', path: '/mentor/dashboard', icon: LayoutDashboard },
+  { name: 'Courses', path: '/mentor/courses', icon: BookOpen },
   { name: 'Signals', path: '/mentor/signals', icon: Radio },
 ];
 

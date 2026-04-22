@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { ArrowLeft, Loader2, Save, Send, Archive } from 'lucide-react';
@@ -51,6 +51,8 @@ function FuncoinPreview({ priceInr, rate }) {
 
 export default function CourseEditor() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/mentor') ? '/mentor' : '/admin';
   const { id } = useParams();
   const isEdit = Boolean(id);
 
@@ -110,12 +112,12 @@ export default function CourseEditor() {
         setTagsDraft((data.tags || []).join(', '));
       } catch (err) {
         toast.error(typeof err === 'string' ? err : 'Failed to load course');
-        navigate('/admin/courses');
+        navigate(`${basePath}/courses`);
       } finally {
         setInitialLoading(false);
       }
     })();
-  }, [id, isEdit, navigate, reset]);
+  }, [basePath, id, isEdit, navigate, reset]);
 
   const onSubmit = async (values) => {
     // Transform the comma-separated tag input into the array the backend
@@ -163,7 +165,7 @@ export default function CourseEditor() {
         toast.success('Draft course created');
         // Drop the admin straight into the edit view so they can add
         // modules and videos without an extra click.
-        navigate(`/admin/courses/${created.id}/edit`, { replace: true });
+        navigate(`${basePath}/courses/${created.id}/edit`, { replace: true });
       }
     } catch (err) {
       const fallback = applyServerErrors(form, err, 'Failed to save course');
@@ -215,7 +217,7 @@ export default function CourseEditor() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/admin/courses')}
+            onClick={() => navigate(`${basePath}/courses`)}
             className="w-9 h-9 rounded-lg bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 flex items-center justify-center"
             aria-label="Back"
           >
@@ -351,7 +353,7 @@ export default function CourseEditor() {
                 if (photo) deleteObject(photo);
                 if (videoUrl) deleteObject(videoUrl);
               }
-              navigate('/admin/courses');
+              navigate(`${basePath}/courses`);
             }}
           >
             Cancel

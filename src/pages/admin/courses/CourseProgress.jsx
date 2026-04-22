@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, Users, Trophy, TrendingUp, BookOpen } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
@@ -42,6 +42,8 @@ function ProgressBar({ pct }) {
 
 export default function CourseProgress() {
   const { id } = useParams();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/mentor') ? '/mentor' : '/admin';
   const [course, setCourse] = useState(null);
   const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
@@ -96,7 +98,7 @@ export default function CourseProgress() {
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <Link
-          to="/admin/courses"
+          to={`${basePath}/courses`}
           className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         >
           <ArrowLeft className="w-4 h-4" /> Back to courses
