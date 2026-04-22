@@ -500,9 +500,8 @@ export default function MentorSignals() {
                 value={selectedMentorId}
                 onChange={(e) => setSelectedMentorId(e.target.value)}
                 className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent text-sm dark:bg-neutral-900 dark:border-neutral-800"
-                required
               >
-                <option value="">Select Mentor</option>
+                <option value="">Post as Myself (Default)</option>
                 {mentorOptions.map((mentor) => (
                   <option key={mentor.id} value={mentor.id}>{mentor.fullName}</option>
                 ))}
