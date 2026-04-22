@@ -1,30 +1,75 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import Cookies from 'js-cookie';
+import { api } from '@/api/axios';
 
 const AuthContext = createContext(null);
 
 const COOKIE_KEY = 'ff_admin_token';
+const PROFILE_KEY = 'ff_admin_profile';
+const AUTH_EXPIRED_EVENT = 'ff-auth-expired';
+const AUTH_FORBIDDEN_EVENT = 'ff-auth-forbidden';
 
 export const AuthProvider = ({ children }) => {
   // null = still checking, false = unauthenticated, true = authenticated
   const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [admin, setAdmin] = useState(null);
 
-  useEffect(() => {
-    const token = Cookies.get(COOKIE_KEY);
-    if (token) {
-      // Trust the cookie on first mount; the API interceptor will handle expiry
-      setIsAuthenticated(true);
-      try {
-        const stored = sessionStorage.getItem('ff_admin_profile');
-        if (stored) setAdmin(JSON.parse(stored));
-      } catch {
-        // sessionStorage can fail in private mode — not critical
-      }
-    } else {
-      setIsAuthenticated(false);
-    }
+  const logout = useCallback(() => {
+    Cookies.remove(COOKIE_KEY);
+    sessionStorage.removeItem(PROFILE_KEY);
+    setIsAuthenticated(false);
+    setAdmin(null);
   }, []);
+
+  useEffect(() => {
+    const hydrateSession = async () => {
+      const token = Cookies.get(COOKIE_KEY);
+      if (!token) {
+        setIsAuthenticated(false);
+        setAdmin(null);
+        return;
+      }
+
+      try {
+        const res = await api.get('/admin-auth/profile');
+        const profile = res?.admin || null;
+        if (!profile) {
+          logout();
+          return;
+        }
+
+        setAdmin(profile);
+        setIsAuthenticated(true);
+        try {
+          sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+        } catch {
+          // ignore storage errors
+        }
+      } catch {
+        logout();
+      }
+    };
+
+    hydrateSession();
+  }, [logout]);
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      logout();
+    };
+
+    const handleRoleForbidden = () => {
+      logout();
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, handleRoleForbidden);
+
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+      window.removeEventListener(AUTH_FORBIDDEN_EVENT, handleRoleForbidden);
+    };
+  }, [logout]);
 
   const login = (token, adminProfile) => {
     // SameSite=Strict blocks CSRF; Secure ensures HTTPS-only in prod.
@@ -39,18 +84,13 @@ export const AuthProvider = ({ children }) => {
     if (adminProfile) {
       setAdmin(adminProfile);
       try {
-        sessionStorage.setItem('ff_admin_profile', JSON.stringify(adminProfile));
+        sessionStorage.setItem(PROFILE_KEY, JSON.stringify(adminProfile));
       } catch {
         // ignore
       }
+    } else {
+      setAdmin(null);
     }
-  };
-
-  const logout = () => {
-    Cookies.remove(COOKIE_KEY);
-    sessionStorage.removeItem('ff_admin_profile');
-    setIsAuthenticated(false);
-    setAdmin(null);
   };
 
   return (
