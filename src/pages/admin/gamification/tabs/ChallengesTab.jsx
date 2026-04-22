@@ -59,7 +59,9 @@ function ChallengeEditor({ initial, busy, onSave, onCancel }) {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Options</label>
+        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+          Options (select the correct one with the radio button)
+        </label>
         <div className="space-y-2">
           {options.map((opt, idx) => (
             <div key={idx} className="flex items-center gap-2">
@@ -268,7 +270,7 @@ export default function ChallengesTab() {
                 onClick={() => setCreating(true)}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
               >
-                <Plus className="w-4 h-4" /> New
+                <Plus className="w-4 h-4" /> New challenge
               </button>
             </div>
           )}

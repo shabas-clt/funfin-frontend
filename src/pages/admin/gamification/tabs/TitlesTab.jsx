@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Loader2, Plus, Save, Edit2, X, Crown } from 'lucide-react';
+import { Loader2, Plus, Save, Edit2, X, Crown, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
@@ -43,6 +43,7 @@ function CreateForm({ onCreated }) {
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">New title</h3>
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Code *</label>
             <input
               {...register('code')}
               placeholder="title_code"
@@ -51,6 +52,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.code} />
           </div>
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Display name *</label>
             <input
               {...register('name')}
               placeholder="Display name"
@@ -59,6 +61,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.name} />
           </div>
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Description</label>
             <input
               {...register('description')}
               placeholder="Description (optional)"
@@ -114,7 +117,7 @@ function EditRow({ title, onSaved, onCancel }) {
   };
 
   return (
-    <tr className="bg-indigo-50/40 dark:bg-indigo-950/20">
+    <tr className="bg-slate-50 dark:bg-neutral-900/70">
       <td className="px-3 py-2 font-mono text-xs text-slate-500 align-top">{title.code}</td>
       <td className="px-3 py-2 align-top">
         <input
@@ -164,6 +167,7 @@ export default function TitlesTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -181,12 +185,33 @@ export default function TitlesTab() {
     load();
   }, [load]);
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      (r.code || '').toLowerCase().includes(q)
+      || (r.name || '').toLowerCase().includes(q)
+      || (r.description || '').toLowerCase().includes(q),
+    );
+  }, [rows, searchQuery]);
+
   return (
     <div className="space-y-4">
       <CreateForm onCreated={(t) => setRows((prev) => [...prev, t])} />
 
       <Card className="bg-white dark:bg-black border border-slate-100 dark:border-neutral-800">
         <CardContent className="p-0 overflow-x-auto">
+          <div className="p-3 border-b border-slate-100 dark:border-neutral-800">
+            <div className="relative w-full max-w-sm">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search code, name, description"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+              />
+            </div>
+          </div>
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 dark:bg-neutral-900 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <tr>
@@ -205,7 +230,7 @@ export default function TitlesTab() {
                   </td>
                 </tr>
               )}
-              {!loading && rows.length === 0 && (
+              {!loading && filteredRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-8 text-center text-slate-500 text-sm">
                     <Crown className="w-5 h-5 inline mr-1 opacity-50" /> No titles yet.
@@ -213,7 +238,7 @@ export default function TitlesTab() {
                 </tr>
               )}
               {!loading &&
-                rows.map((title) =>
+                filteredRows.map((title) =>
                   editingId === title.id ? (
                     <EditRow
                       key={title.id}

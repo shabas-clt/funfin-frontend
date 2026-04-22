@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Edit, Trash, Eye, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -27,7 +27,8 @@ export default function MentorManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [page, setPage] = useState(1);
+  const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -45,13 +46,24 @@ export default function MentorManagement() {
     defaultValues: EDIT_DEFAULTS,
   });
 
-  const fetchMentors = async () => {
+  const fetchMentors = async (nextSkip = skip) => {
     try {
       setIsLoading(true);
-      const res = await api.get('/admins', { params: { role: 'mentor', limit: 200 } });
+      const res = await api.get('/admins', {
+        params: {
+          role: 'mentor',
+          isActive: filterStatus === 'All' || !filterStatus ? undefined : filterStatus === 'Active',
+          q: searchQuery || undefined,
+          skip: nextSkip,
+          limit: PAGE_SIZE,
+        },
+      });
       setMentors(res.admins || []);
+      setTotal(res.total || 0);
+      setSkip(nextSkip);
     } catch {
       setMentors([]);
+      setTotal(0);
       toast.error('Failed to load mentors');
     } finally {
       setIsLoading(false);
@@ -59,30 +71,7 @@ export default function MentorManagement() {
   };
 
   useEffect(() => {
-    fetchMentors();
-  }, []);
-
-  const filtered = useMemo(() => {
-    return mentors.filter((mentor) => {
-      const statusText = mentor.isActive ? 'Active' : 'Inactive';
-      const matchesStatus = !filterStatus || statusText === filterStatus;
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery
-        || (mentor.fullName || '').toLowerCase().includes(query)
-        || (mentor.email || '').toLowerCase().includes(query);
-      return matchesStatus && matchesSearch;
-    });
-  }, [mentors, filterStatus, searchQuery]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount);
-  const paged = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
-
-  useEffect(() => {
-    setPage(1);
+    fetchMentors(0);
   }, [searchQuery, filterStatus]);
 
   const openAddModal = () => {
@@ -221,9 +210,9 @@ export default function MentorManagement() {
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : paged.length === 0 ? (
+            ) : mentors.length === 0 ? (
               <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No mentors found</p>
-            ) : paged.map((person) => {
+            ) : mentors.map((person) => {
               const badgeClass = person.isActive
                 ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
                 : 'bg-rose-100/70 text-rose-500 dark:bg-rose-900/40 dark:text-rose-400';
@@ -268,11 +257,11 @@ export default function MentorManagement() {
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={5} cols={5} />
-                ) : paged.length === 0 ? (
+                ) : mentors.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-10 text-center text-slate-400 dark:text-slate-500">No mentors found</td>
                   </tr>
-                ) : paged.map((person) => {
+                ) : mentors.map((person) => {
                   const statusText = person.isActive ? 'Active' : 'Inactive';
                   const badgeClass = person.isActive
                     ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
@@ -317,25 +306,25 @@ export default function MentorManagement() {
               </tbody>
             </table>
           </div>
-          {!isLoading && filtered.length > PAGE_SIZE && (
+          {!isLoading && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
               </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={skip <= 0}
+                  onClick={() => fetchMentors(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" /> Prev
                 </button>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{currentPage} / {pageCount}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
                 <button
                   type="button"
-                  disabled={currentPage >= pageCount}
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={skip + PAGE_SIZE >= total}
+                  onClick={() => fetchMentors(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
                   Next <ChevronRight className="w-3.5 h-3.5" />
