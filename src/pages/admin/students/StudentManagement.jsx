@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Trash, Eye, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -29,16 +29,36 @@ export default function StudentManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [page, setPage] = useState(1);
+  const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (nextSkip = skip) => {
     try {
       setIsLoading(true);
-      const res = await api.get('/students');
+      const sortMap = {
+        newest: { sortBy: 'createdAt', sortOrder: 'desc' },
+        oldest: { sortBy: 'createdAt', sortOrder: 'asc' },
+        'name-asc': { sortBy: 'name', sortOrder: 'asc' },
+        'name-desc': { sortBy: 'name', sortOrder: 'desc' },
+      };
+      const sortCfg = sortMap[sortBy] || sortMap.newest;
+      const res = await api.get('/students', {
+        params: {
+          skip: nextSkip,
+          limit: PAGE_SIZE,
+          q: searchQuery || undefined,
+          role: filterRole || undefined,
+          sortBy: sortCfg.sortBy,
+          sortOrder: sortCfg.sortOrder,
+        },
+      });
       setStudents(res.students || []);
+      setTotal(res.total || 0);
+      setSkip(nextSkip);
     } catch {
       setStudents([]);
+      setTotal(0);
       toast.error('Failed to load students');
     } finally {
       setIsLoading(false);
@@ -46,42 +66,7 @@ export default function StudentManagement() {
   };
 
   useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  const filtered = useMemo(() => {
-    const rows = students.filter((student) => {
-      const role = primaryRole(student.roles);
-      const matchesRole = !filterRole || role === filterRole;
-      const fullName = student.fullName || '';
-      const email = student.email || '';
-      const q = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery
-        || fullName.toLowerCase().includes(q)
-        || email.toLowerCase().includes(q);
-      return matchesRole && matchesSearch;
-    });
-
-    rows.sort((a, b) => {
-      if (sortBy === 'name-asc') return (a.fullName || '').localeCompare(b.fullName || '');
-      if (sortBy === 'name-desc') return (b.fullName || '').localeCompare(a.fullName || '');
-      const ad = new Date(a.createdAt || 0).getTime();
-      const bd = new Date(b.createdAt || 0).getTime();
-      return sortBy === 'oldest' ? ad - bd : bd - ad;
-    });
-
-    return rows;
-  }, [students, filterRole, searchQuery, sortBy]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount);
-  const paged = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
-
-  useEffect(() => {
-    setPage(1);
+    fetchStudents(0);
   }, [searchQuery, filterRole, sortBy]);
 
   const handleDelete = async (id) => {
@@ -155,9 +140,9 @@ export default function StudentManagement() {
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : paged.length === 0 ? (
+            ) : students.length === 0 ? (
               <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No students found</p>
-            ) : paged.map((student) => {
+            ) : students.map((student) => {
               const role = primaryRole(student.roles);
               const roleClass = role === 'mentor'
                 ? 'bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400'
@@ -218,11 +203,11 @@ export default function StudentManagement() {
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={6} cols={6} />
-                ) : paged.length === 0 ? (
+                ) : students.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-10 text-center text-slate-400 dark:text-slate-500">No students found</td>
                   </tr>
-                ) : paged.map((student) => {
+                ) : students.map((student) => {
                   const role = primaryRole(student.roles);
                   const roleClass = role === 'mentor'
                     ? 'bg-indigo-100/70 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400'
@@ -274,25 +259,25 @@ export default function StudentManagement() {
             </table>
           </div>
 
-          {!isLoading && filtered.length > PAGE_SIZE && (
+          {!isLoading && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
               </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={skip <= 0}
+                  onClick={() => fetchStudents(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" /> Prev
                 </button>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{currentPage} / {pageCount}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
                 <button
                   type="button"
-                  disabled={currentPage >= pageCount}
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={skip + PAGE_SIZE >= total}
+                  onClick={() => fetchStudents(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
                   Next <ChevronRight className="w-3.5 h-3.5" />

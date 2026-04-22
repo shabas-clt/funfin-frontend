@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Loader2, Plus, Save, Edit2, X, Award } from 'lucide-react';
+import { Loader2, Plus, Save, Edit2, X, Award, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
@@ -50,6 +50,7 @@ function CreateForm({ onCreated }) {
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">New badge</h3>
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Code *</label>
             <input
               {...register('code')}
               placeholder="badge_code"
@@ -58,6 +59,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.code} />
           </div>
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Name *</label>
             <input
               {...register('name')}
               placeholder="Display name"
@@ -66,6 +68,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.name} />
           </div>
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Icon URL</label>
             <input
               {...register('iconUrl')}
               placeholder="Icon URL (optional)"
@@ -84,6 +87,7 @@ function CreateForm({ onCreated }) {
             </button>
           </div>
           <div className="md:col-span-6">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Description</label>
             <input
               {...register('description')}
               placeholder="Description (optional)"
@@ -127,7 +131,7 @@ function EditCard({ badge, onSaved, onCancel }) {
   };
 
   return (
-    <div className="p-4 border rounded-xl border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-950/20 space-y-2">
+    <div className="p-4 border rounded-xl border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-900/70 space-y-2">
       <div className="flex items-center justify-between">
         <div className="font-mono text-xs text-slate-500">{badge.code}</div>
         <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
@@ -179,6 +183,7 @@ export default function BadgesTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -196,9 +201,32 @@ export default function BadgesTab() {
     load();
   }, [load]);
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      (r.code || '').toLowerCase().includes(q)
+      || (r.name || '').toLowerCase().includes(q)
+      || (r.description || '').toLowerCase().includes(q),
+    );
+  }, [rows, searchQuery]);
+
   return (
     <div className="space-y-4">
       <CreateForm onCreated={(b) => setRows((prev) => [...prev, b])} />
+      <Card className="bg-white dark:bg-black border border-slate-100 dark:border-neutral-800">
+        <CardContent className="p-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search badges"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {loading && (
@@ -206,13 +234,13 @@ export default function BadgesTab() {
             <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
           </div>
         )}
-        {!loading && rows.length === 0 && (
+        {!loading && filteredRows.length === 0 && (
           <div className="col-span-full p-8 text-center text-sm text-slate-500">
             No badges yet.
           </div>
         )}
         {!loading &&
-          rows.map((badge) =>
+          filteredRows.map((badge) =>
             editingId === badge.id ? (
               <EditCard
                 key={badge.id}

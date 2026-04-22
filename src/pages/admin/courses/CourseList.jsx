@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Edit, Trash, Eye, Send, Archive, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import Swal from 'sweetalert2';
 import { formatShortDate, formatInr } from '@/lib/format';
 
 const FILTER_OPTIONS = ['All', 'published', 'draft'];
+const PAGE_SIZE = 12;
 
 const stateBadgeClass = (state) => {
   if (state === 'published') return 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400';
@@ -29,17 +30,22 @@ export default function CourseList() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterState, setFilterState] = useState('');
+  const [skip, setSkip] = useState(0);
+  const [total, setTotal] = useState(0);
 
-  const fetchCourses = async () => {
+  const fetchCourses = async (nextSkip = skip) => {
     try {
       setIsLoading(true);
-      const params = { limit: 100 };
+      const params = { limit: PAGE_SIZE, skip: nextSkip };
       if (filterState) params.state = filterState;
       if (searchQuery.trim()) params.q = searchQuery.trim();
       const res = await api.get('/courses', { params });
       setCourses(res.courses || []);
+      setTotal(res.total || 0);
+      setSkip(nextSkip);
     } catch {
       setCourses([]);
+      setTotal(0);
       toast.error('Failed to load courses');
     } finally {
       setIsLoading(false);
@@ -47,19 +53,13 @@ export default function CourseList() {
   };
 
   useEffect(() => {
-    fetchCourses();
-  }, [filterState]);
+    fetchCourses(0);
+  }, [filterState, searchQuery]);
 
   const onSearch = (event) => {
     event.preventDefault();
-    fetchCourses();
+    fetchCourses(0);
   };
-
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return courses;
-    const q = searchQuery.trim().toLowerCase();
-    return courses.filter((c) => (c.title || '').toLowerCase().includes(q));
-  }, [courses, searchQuery]);
 
   const handleDelete = async (course) => {
     const result = await Swal.fire({
@@ -145,9 +145,9 @@ export default function CourseList() {
                   <div key={i} className="h-24 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
+            ) : courses.length === 0 ? (
               <p className="p-6 text-center text-slate-400 dark:text-slate-500 text-sm">No courses found</p>
-            ) : filtered.map((course) => {
+            ) : courses.map((course) => {
               const state = normalizeState(course);
               return (
                 <div key={course.id} className="rounded-xl border border-slate-100 dark:border-neutral-800 p-3 flex gap-3">
@@ -195,11 +195,11 @@ export default function CourseList() {
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
                   <TableSkeleton rows={6} cols={6} />
-                ) : filtered.length === 0 ? (
+                ) : courses.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="p-10 text-center text-slate-400 dark:text-slate-500">No courses match your filter</td>
                   </tr>
-                ) : filtered.map((course) => {
+                ) : courses.map((course) => {
                   const state = normalizeState(course);
                   const isPublished = state === 'published';
                   return (
@@ -255,6 +255,32 @@ export default function CourseList() {
               </tbody>
             </table>
           </div>
+          {!isLoading && total > PAGE_SIZE && (
+            <div className="px-5 pt-2 flex items-center justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={skip <= 0}
+                  onClick={() => fetchCourses(Math.max(0, skip - PAGE_SIZE))}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
+                <button
+                  type="button"
+                  disabled={skip + PAGE_SIZE >= total}
+                  onClick={() => fetchCourses(skip + PAGE_SIZE)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Loader2, Send, Users, User as UserIcon, AlertTriangle } from 'lucide-react';
@@ -12,11 +12,16 @@ import { notificationCreateSchema } from '@/lib/validation/schemas';
 export default function NotificationBroadcast() {
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [userMatches, setUserMatches] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm({
@@ -31,6 +36,29 @@ export default function NotificationBroadcast() {
   });
 
   const target = watch('target');
+  const userId = watch('userId');
+
+  useEffect(() => {
+    if (target !== 'user') return;
+    if (!userSearch.trim()) {
+      setUserMatches([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        setLoadingUsers(true);
+        const res = await api.get('/students', {
+          params: { q: userSearch.trim(), limit: 8, skip: 0, sortBy: 'name', sortOrder: 'asc' },
+        });
+        setUserMatches(res.students || []);
+      } catch {
+        setUserMatches([]);
+      } finally {
+        setLoadingUsers(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [userSearch, target]);
 
   const onSubmit = async (values) => {
     // Broadcasting to everyone is irreversible; require an explicit second
@@ -50,19 +78,7 @@ export default function NotificationBroadcast() {
 
     setSending(true);
     try {
-      let resolvedUserId = values.userId?.trim();
-      if (values.target === 'user' && resolvedUserId?.includes('@')) {
-        const usersRes = await api.get('/students');
-        const match = (usersRes.students || []).find(
-          (u) => String(u.email || '').toLowerCase() === resolvedUserId.toLowerCase(),
-        );
-        if (!match?.id) {
-          toast.error('No user found with that email');
-          setSending(false);
-          return;
-        }
-        resolvedUserId = match.id;
-      }
+      const resolvedUserId = values.userId?.trim();
 
       const payload = {
         title: values.title.trim(),
@@ -154,17 +170,45 @@ export default function NotificationBroadcast() {
             {target === 'user' && (
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  User ID
+                  Choose user
                 </label>
                 <input
-                  {...register('userId')}
-                  placeholder="MongoDB user ID or exact email"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm font-mono"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Search by name or email"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
                 />
+                {loadingUsers && <p className="mt-1 text-xs text-slate-500">Searching...</p>}
+                {!loadingUsers && userMatches.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-slate-200 dark:border-neutral-700 divide-y divide-slate-100 dark:divide-neutral-800 max-h-48 overflow-y-auto">
+                    {userMatches.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setUserSearch(`${u.fullName || ''} (${u.email || ''})`);
+                          setValue('userId', u.id, { shouldValidate: true, shouldDirty: true });
+                          setUserMatches([]);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-neutral-800"
+                      >
+                        <div className="text-sm text-slate-900 dark:text-white">{u.fullName || 'Unknown'}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{u.email || u.id}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input type="hidden" {...register('userId')} />
                 <FieldError error={errors.userId} />
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  You can paste a user ID directly or provide a user email to auto-resolve.
+                  Select a user from search results. We send their internal user id in the API.
                 </p>
+                {selectedUser && userId && (
+                  <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                    Selected: {selectedUser.fullName || selectedUser.email} ({userId})
+                  </p>
+                )}
               </div>
             )}
 

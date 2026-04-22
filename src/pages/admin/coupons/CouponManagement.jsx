@@ -131,6 +131,7 @@ function CreateForm({ onCreated }) {
           className="grid grid-cols-1 md:grid-cols-6 gap-3"
         >
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Coupon code *</label>
             <input
               {...register('code')}
               placeholder="CODE (e.g. WELCOME10)"
@@ -139,6 +140,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.code} />
           </div>
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Public title</label>
             <input
               {...register('title')}
               placeholder="Title (optional)"
@@ -147,6 +149,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.title} />
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Discount type *</label>
             <select
               {...register('discountType')}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
@@ -156,6 +159,7 @@ function CreateForm({ onCreated }) {
             </select>
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Discount value *</label>
             <input
               type="number"
               step="0.01"
@@ -164,43 +168,6 @@ function CreateForm({ onCreated }) {
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
             />
             <FieldError error={errors.discountValue} />
-          </div>
-
-          <div className="md:col-span-2">
-            <input
-              type="number"
-              step="0.01"
-              {...register('maxDiscountInr')}
-              placeholder="Max discount INR (percent only)"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-              disabled={discountType !== 'percent'}
-            />
-            <FieldError error={errors.maxDiscountInr} />
-          </div>
-          <div>
-            <input
-              type="number"
-              step="0.01"
-              {...register('minOrderAmountInr', { valueAsNumber: true })}
-              placeholder="Min order INR"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-            />
-          </div>
-          <div>
-            <input
-              type="number"
-              {...register('perUserLimit', { valueAsNumber: true })}
-              placeholder="Per-user limit"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-            />
-          </div>
-          <div>
-            <input
-              type="number"
-              {...register('usageLimit')}
-              placeholder="Total limit (blank = ∞)"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-            />
           </div>
           <div>
             <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 h-full pt-2">
@@ -243,24 +210,72 @@ function CreateForm({ onCreated }) {
               Create coupon
             </button>
           </div>
-
           <div className="md:col-span-6">
-            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-              Applicable course IDs (blank = all courses, or comma-separated)
-            </label>
-            <input
-              {...register('applicableCourseIdsText')}
-              placeholder="64fab1... , 64fab2..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm font-mono"
-            />
-          </div>
-
-          <div className="md:col-span-6">
-            <input
-              {...register('description')}
-              placeholder="Description (optional)"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-            />
+            <details className="rounded-lg border border-slate-200 dark:border-neutral-700">
+              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Advanced settings (limits, scope, schedule)
+              </summary>
+              <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 border-t border-slate-200 dark:border-neutral-700">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Max discount (percent only)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register('maxDiscountInr')}
+                    placeholder="Optional INR cap"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                    disabled={discountType !== 'percent'}
+                  />
+                  <FieldError error={errors.maxDiscountInr} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Minimum order amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register('minOrderAmountInr', { valueAsNumber: true })}
+                    placeholder="Optional floor amount"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Per-user redemption limit</label>
+                  <input
+                    type="number"
+                    {...register('perUserLimit', { valueAsNumber: true })}
+                    placeholder="Default 1"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Total coupon usage limit</label>
+                  <input
+                    type="number"
+                    {...register('usageLimit')}
+                    placeholder="Blank means unlimited"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                    Applicable course IDs (blank = all courses)
+                  </label>
+                  <input
+                    {...register('applicableCourseIdsText')}
+                    placeholder="Comma-separated course IDs"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm font-mono"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Internal description</label>
+                  <input
+                    {...register('description')}
+                    placeholder="Optional notes for admins"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                  />
+                </div>
+              </div>
+            </details>
           </div>
         </form>
       </CardContent>

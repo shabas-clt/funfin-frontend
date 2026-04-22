@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { Loader2, Plus, Save, X, Edit2 } from 'lucide-react';
+import { Loader2, Plus, Save, X, Edit2, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
@@ -69,6 +69,7 @@ function CreateForm({ onCreated }) {
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">New mission</h3>
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Code *</label>
             <input
               {...register('code')}
               placeholder="mission_code"
@@ -77,6 +78,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.code} />
           </div>
           <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Title *</label>
             <input
               {...register('title')}
               placeholder="Title"
@@ -85,6 +87,7 @@ function CreateForm({ onCreated }) {
             <FieldError error={errors.title} />
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Type *</label>
             <select
               {...register('missionType')}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
@@ -97,6 +100,7 @@ function CreateForm({ onCreated }) {
             </select>
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Target count</label>
             <input
               type="number"
               {...register('targetCount', { valueAsNumber: true })}
@@ -105,6 +109,7 @@ function CreateForm({ onCreated }) {
             />
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Reward coins</label>
             <input
               type="number"
               {...register('rewardCoins', { valueAsNumber: true })}
@@ -113,6 +118,7 @@ function CreateForm({ onCreated }) {
             />
           </div>
           <div className="md:col-span-6">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Description *</label>
             <input
               {...register('description')}
               placeholder="Description"
@@ -177,7 +183,7 @@ function EditRow({ mission, onSaved, onCancel }) {
   };
 
   return (
-    <tr className="bg-indigo-50/40 dark:bg-indigo-950/20">
+    <tr className="bg-slate-50 dark:bg-neutral-900/70">
       <td className="px-3 py-2 font-mono text-xs text-slate-500 align-top">{mission.code}</td>
       <td className="px-3 py-2 align-top">
         <input
@@ -255,6 +261,7 @@ export default function MissionsTab() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -274,28 +281,49 @@ export default function MissionsTab() {
     load();
   }, [load]);
 
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      (r.code || '').toLowerCase().includes(q)
+      || (r.title || '').toLowerCase().includes(q)
+      || (r.description || '').toLowerCase().includes(q),
+    );
+  }, [rows, searchQuery]);
+
   return (
     <div className="space-y-4">
       <CreateForm onCreated={(m) => setRows((prev) => [m, ...prev])} />
 
       <Card className="bg-white dark:bg-black border border-slate-100 dark:border-neutral-800">
         <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-              Missions <span className="text-xs text-slate-500">({rows.length})</span>
+              Missions <span className="text-xs text-slate-500">({filteredRows.length})</span>
             </h3>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
-            >
-              <option value="">All types</option>
-              {MISSION_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <div className="relative w-56">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search missions"
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                />
+              </div>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+              >
+                <option value="">All types</option>
+                {MISSION_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="overflow-x-auto -mx-4">
@@ -319,7 +347,7 @@ export default function MissionsTab() {
                     </td>
                   </tr>
                 )}
-                {!loading && rows.length === 0 && (
+                {!loading && filteredRows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-3 py-8 text-center text-slate-500 text-sm">
                       No missions.
@@ -327,7 +355,7 @@ export default function MissionsTab() {
                   </tr>
                 )}
                 {!loading &&
-                  rows.map((mission) =>
+                  filteredRows.map((mission) =>
                     editingId === mission.id ? (
                       <EditRow
                         key={mission.id}
