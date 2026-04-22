@@ -148,7 +148,16 @@ export default function MentorSignals() {
             </div>
             <div>
               <label className="text-sm font-medium">Timeframe</label>
-              <Input {...register('timeframe')} className="mt-1" placeholder="Intraday / Swing" />
+              <select
+                {...register('timeframe')}
+                className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent dark:bg-neutral-900 dark:border-neutral-800"
+              >
+                <option value="">Select Timeframe</option>
+                <option value="Intraday">Intraday</option>
+                <option value="Swing">Swing</option>
+                <option value="Short Term">Short Term</option>
+                <option value="Long Term">Long Term</option>
+              </select>
               <FieldError error={errors.timeframe} />
             </div>
             <div>
@@ -167,23 +176,60 @@ export default function MentorSignals() {
               <FieldError error={errors.targetPrices} />
             </div>
             <div>
-              <label className="text-sm font-medium">Confidence (1-5)</label>
-              <Input type="number" min="1" max="5" {...register('confidence')} className="mt-1" />
+              <label className="text-sm font-medium flex justify-between">
+                <span>Confidence</span>
+                <span className="text-indigo-600 dark:text-indigo-400 font-bold">{form.watch('confidence')} / 5</span>
+              </label>
+              <input 
+                type="range" 
+                min="1" 
+                max="5" 
+                step="1" 
+                {...register('confidence')} 
+                className="mt-3 w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-neutral-800 accent-indigo-600" 
+              />
               <FieldError error={errors.confidence} />
             </div>
             <div>
               <label className="text-sm font-medium">Exchange</label>
-              <Input {...register('exchange')} className="mt-1" placeholder="NSE" />
+              <select
+                {...register('exchange')}
+                className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent text-sm dark:bg-neutral-900 dark:border-neutral-800"
+              >
+                <option value="">Select Exchange</option>
+                <option value="NSE">NSE</option>
+                <option value="BSE">BSE</option>
+                <option value="MCX">MCX</option>
+                <option value="FOREX">FOREX</option>
+                <option value="CRYPTO">CRYPTO</option>
+              </select>
               <FieldError error={errors.exchange} />
             </div>
             <div>
               <label className="text-sm font-medium">Segment</label>
-              <Input {...register('segment')} className="mt-1" placeholder="EQ / FNO" />
+              <select
+                {...register('segment')}
+                className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent text-sm dark:bg-neutral-900 dark:border-neutral-800"
+              >
+                <option value="">Select Segment</option>
+                <option value="EQ">Equity (EQ)</option>
+                <option value="FNO">Futures & Options (FNO)</option>
+                <option value="COMMODITY">Commodity</option>
+                <option value="CURRENCY">Currency</option>
+              </select>
               <FieldError error={errors.segment} />
             </div>
             <div>
               <label className="text-sm font-medium">Risk Level</label>
-              <Input {...register('riskLevel')} className="mt-1" placeholder="Low / Medium / High" />
+              <select
+                {...register('riskLevel')}
+                className="mt-1 h-9 w-full rounded-md border px-3 bg-transparent text-sm dark:bg-neutral-900 dark:border-neutral-800"
+              >
+                <option value="">Select Risk</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
               <FieldError error={errors.riskLevel} />
             </div>
             <div>
