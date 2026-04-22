@@ -18,6 +18,7 @@ const adminMenus = [
   { name: 'FunCoin', path: '/admin/funcoin', icon: Coins },
   { name: 'Coupons', path: '/admin/coupons', icon: Tag },
   { header: 'Engagement' },
+  { name: 'Signals', path: '/admin/signals', icon: Radio },
   { name: 'Gamification', path: '/admin/gamification', icon: Gamepad2 },
   { name: 'Notifications', path: '/admin/notifications', icon: Bell },
 ];
@@ -63,7 +64,7 @@ const Sidebar = ({ isOpen, setIsOpen, role = 'admin' }) => {
         <div className="flex h-[72px] shrink-0 items-center justify-between px-6 pt-2">
           <div className="flex items-center">
             <img src="/branding/logo-light.png" alt="FunFin" className="h-8 w-auto max-w-[140px] object-contain block dark:hidden" />
-            <img src="/branding/logo-dark.png" alt="FunFin" className="h-12 w-auto max-w-[140px] object-contain hidden dark:block" />
+            <img src="/branding/logo-dark.png" alt="FunFin" className="h-8 w-auto max-w-[140px] object-contain hidden dark:block" />
           </div>
           <button onClick={() => setIsOpen(false)} className="lg:hidden text-slate-500 hover:text-slate-900 dark:hover:text-white focus:outline-none">
             <X className="w-5 h-5" />
