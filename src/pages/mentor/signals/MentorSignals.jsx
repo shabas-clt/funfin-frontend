@@ -29,6 +29,10 @@ const SORT_OPTIONS = [
   { value: 'headline', label: 'Headline' },
   { value: 'status', label: 'Status' },
 ];
+const OWNER_SCOPE_OPTIONS = [
+  { value: 'all', label: 'All Signals' },
+  { value: 'mine', label: 'My Signals' },
+];
 
 const INITIAL_FORM = {
   headline: '',
@@ -84,6 +88,7 @@ export default function MentorSignals() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [mentorFilter, setMentorFilter] = useState('');
+  const [ownerScope, setOwnerScope] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
@@ -144,7 +149,12 @@ export default function MentorSignals() {
       if (statusFilter) params.status = statusFilter;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
-      if (isSuperadmin && mentorFilter) params.mentorId = mentorFilter;
+      if (isSuperadmin && mentorFilter) {
+        params.mentorId = mentorFilter;
+      }
+      if (!isSuperadmin && ownerScope === 'mine' && admin?.id) {
+        params.mentorId = admin.id;
+      }
 
       const res = await api.get('/mentor/signals', { params });
       setSignals(res.signals || []);
@@ -161,7 +171,7 @@ export default function MentorSignals() {
 
   useEffect(() => {
     loadSignals(0);
-  }, [statusFilter, mentorFilter, startDate, endDate, sortBy, sortOrder]);
+  }, [statusFilter, mentorFilter, ownerScope, startDate, endDate, sortBy, sortOrder]);
 
   useEffect(() => {
     loadMentorOptions();
@@ -224,6 +234,15 @@ export default function MentorSignals() {
   };
 
   const onSubmit = async (values) => {
+    const normalizedTargets = Array.isArray(values.targetPrices)
+      ? values.targetPrices
+          .map((value) => Number(value))
+          .filter((value) => Number.isFinite(value) && value > 0)
+      : (values.targetPrices || '')
+          .split(',')
+          .map((value) => parseFloat(value.trim()))
+          .filter((value) => Number.isFinite(value) && value > 0);
+
     const payload = {
       headline: values.headline,
       instrument: values.instrument,
@@ -232,9 +251,7 @@ export default function MentorSignals() {
       direction: values.direction,
       entryPrice: values.entryPrice,
       stopLoss: values.stopLoss,
-      targetPrices: values.targetPrices
-        ? values.targetPrices.split(',').map(p => parseFloat(p.trim())).filter(Boolean)
-        : [],
+      targetPrices: normalizedTargets,
       timeframe: values.timeframe || undefined,
       riskLevel: values.riskLevel || undefined,
       confidence: values.confidence,
@@ -263,6 +280,12 @@ export default function MentorSignals() {
       const fallback = applyServerErrors(form, err, editingSignal ? 'Failed to update signal' : 'Failed to create signal');
       if (fallback) toast.error(fallback);
     }
+  };
+
+  const canManageSignal = (signal) => {
+    if (isSuperadmin) return true;
+    if (!admin?.id) return false;
+    return String(signal.mentorUserId) === String(admin.id);
   };
 
   return (
@@ -318,7 +341,15 @@ export default function MentorSignals() {
                 ))}
               </select>
             ) : (
-              <div className="hidden xl:block" />
+              <select
+                value={ownerScope}
+                onChange={(e) => setOwnerScope(e.target.value)}
+                className="h-10 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 text-[13px]"
+              >
+                {OWNER_SCOPE_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
             )}
 
             <input
@@ -383,14 +414,16 @@ export default function MentorSignals() {
                   <span className="text-xs text-slate-500">Entry {signal.entryPrice} · SL {signal.stopLoss}</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-2">Created: {formatShortDateTime(signal.createdAt)}</p>
-                <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => openEditModal(signal)} className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center" aria-label="Edit">
-                    <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-                  </button>
-                  <button onClick={() => handleDelete(signal)} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center" aria-label="Delete">
-                    <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-                  </button>
-                </div>
+                {canManageSignal(signal) && (
+                  <div className="flex items-center justify-end gap-2 mt-3">
+                    <button onClick={() => openEditModal(signal)} className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center" aria-label="Edit">
+                      <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                    </button>
+                    <button onClick={() => handleDelete(signal)} className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center" aria-label="Delete">
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -437,14 +470,18 @@ export default function MentorSignals() {
                     <td className="px-5 py-3.5">{formatShortDateTime(signal.createdAt)}</td>
                     <td className="px-5 py-3.5">{signal.validUntil ? formatShortDateTime(signal.validUntil) : '-'}</td>
                     <td className="px-5 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(signal)} className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center justify-center" aria-label="Edit">
-                          <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-                        </button>
-                        <button onClick={() => handleDelete(signal)} className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center" aria-label="Delete">
-                          <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-                        </button>
-                      </div>
+                      {canManageSignal(signal) ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openEditModal(signal)} className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center justify-center" aria-label="Edit">
+                            <Edit className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                          </button>
+                          <button onClick={() => handleDelete(signal)} className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center" aria-label="Delete">
+                            <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">View only</span>
+                      )}
                     </td>
                   </tr>
                 ))}
