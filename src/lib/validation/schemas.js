@@ -191,6 +191,12 @@ const positiveNumber = (label) =>
     .positive(`${label} must be greater than 0`)
     .required(`${label} is required`);
 
+const parseLocalDateTime = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 export const signalCreateSchema = yup.object({
   headline: requiredString('Headline').min(4, 'Headline is too short').max(140),
   instrument: requiredString('Instrument').min(2).max(40),
@@ -232,7 +238,22 @@ export const signalCreateSchema = yup.object({
     .max(5, 'Confidence must be between 1 and 5')
     .optional(),
   rationale: yup.string().trim().max(2000).optional(),
-  validUntil: yup.string().trim().optional(),
+  validFrom: yup.string().trim().required('Valid from is required'),
+  validUntil: yup.string().trim().required('Valid until is required'),
+}).test('signal-schedule-range', function (values) {
+  const validFrom = parseLocalDateTime(values?.validFrom);
+  const validUntil = parseLocalDateTime(values?.validUntil);
+  if (!validFrom || !validUntil) return true;
+
+  if (validFrom < new Date(Date.now() - 60 * 1000)) {
+    return this.createError({ path: 'validFrom', message: 'Valid from cannot be in the past' });
+  }
+
+  if (validUntil <= validFrom) {
+    return this.createError({ path: 'validUntil', message: 'Valid until must be after valid from' });
+  }
+
+  return true;
 });
 
 // ----- admin: funcoin pricing -----
