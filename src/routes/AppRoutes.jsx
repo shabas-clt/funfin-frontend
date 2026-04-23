@@ -14,6 +14,7 @@ import CouponManagement from '../pages/admin/coupons/CouponManagement';
 import CourseProgress from '../pages/admin/courses/CourseProgress';
 import GamificationManagement from '../pages/admin/gamification/GamificationManagement';
 import NotificationBroadcast from '../pages/admin/notifications/NotificationBroadcast';
+import LiveChart from '../pages/admin/live-chart/LiveChart';
 import MentorDashboard from '../pages/mentor/dashboard/MentorDashboard';
 import MentorSignals from '../pages/mentor/signals/MentorSignals';
 import SignIn from '../pages/auth/SignIn';
@@ -44,6 +45,7 @@ const AppRoutes = () => {
             <Route path="gamification" element={<PageTransition><GamificationManagement /></PageTransition>} />
             <Route path="notifications" element={<PageTransition><NotificationBroadcast /></PageTransition>} />
             <Route path="signals" element={<PageTransition><MentorSignals /></PageTransition>} />
+            <Route path="live-chart" element={<PageTransition><LiveChart /></PageTransition>} />
           </Route>
         </Route>
 
