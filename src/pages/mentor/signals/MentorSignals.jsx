@@ -18,6 +18,7 @@ import { formatShortDateTime } from '@/lib/format';
 const PAGE_SIZE = 12;
 const STATUS_OPTIONS = [
   { value: '', label: 'All Status' },
+  { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Active' },
   { value: 'closed', label: 'Closed' },
   { value: 'canceled', label: 'Canceled' },
@@ -47,6 +48,7 @@ const INITIAL_FORM = {
   riskLevel: '',
   confidence: 3,
   rationale: '',
+  validFrom: '',
   validUntil: '',
 };
 
@@ -64,6 +66,7 @@ function toDateTimeLocal(isoValue) {
 }
 
 function statusBadgeClass(status) {
+  if (status === 'pending') return 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400';
   if (status === 'active') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400';
   if (status === 'closed') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400';
   return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400';
@@ -116,6 +119,7 @@ export default function MentorSignals() {
 
   const currentPage = useMemo(() => Math.floor(skip / PAGE_SIZE) + 1, [skip]);
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
+  const minDateTime = useMemo(() => toDateTimeLocal(new Date().toISOString()), []);
 
   const loadMentorOptions = async () => {
     if (!isSuperadmin) return;
@@ -205,6 +209,7 @@ export default function MentorSignals() {
       riskLevel: signal.riskLevel || '',
       confidence: signal.confidence || 3,
       rationale: signal.rationale || '',
+      validFrom: toDateTimeLocal(signal.validFrom),
       validUntil: toDateTimeLocal(signal.validUntil),
     });
     setIsFormOpen(true);
@@ -256,6 +261,7 @@ export default function MentorSignals() {
       riskLevel: values.riskLevel || undefined,
       confidence: values.confidence,
       rationale: values.rationale || undefined,
+      validFrom: values.validFrom ? new Date(values.validFrom).toISOString() : undefined,
       validUntil: values.validUntil ? new Date(values.validUntil).toISOString() : undefined,
     };
 
@@ -402,6 +408,7 @@ export default function MentorSignals() {
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{signal.headline}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{signal.instrument} · {signal.mentorName || '-'}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Valid from {signal.validFrom ? formatShortDateTime(signal.validFrom) : '-'} · until {signal.validUntil ? formatShortDateTime(signal.validUntil) : '-'}</p>
                   </div>
                   <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${statusBadgeClass(signal.status)}`}>
                     {signal.status}
@@ -437,16 +444,17 @@ export default function MentorSignals() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Direction</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Created</th>
+                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Valid From</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Valid Until</th>
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
                 {isLoading ? (
-                  <TableSkeleton rows={6} cols={7} />
+                  <TableSkeleton rows={6} cols={8} />
                 ) : signals.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="p-10 text-center text-slate-400 dark:text-slate-500">No signals match your filter</td>
+                    <td colSpan="8" className="p-10 text-center text-slate-400 dark:text-slate-500">No signals match your filter</td>
                   </tr>
                 ) : signals.map((signal) => (
                   <tr key={signal.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-900/70 group transition-colors">
@@ -468,6 +476,7 @@ export default function MentorSignals() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">{formatShortDateTime(signal.createdAt)}</td>
+                    <td className="px-5 py-3.5">{signal.validFrom ? formatShortDateTime(signal.validFrom) : '-'}</td>
                     <td className="px-5 py-3.5">{signal.validUntil ? formatShortDateTime(signal.validUntil) : '-'}</td>
                     <td className="px-5 py-3.5 text-right">
                       {canManageSignal(signal) ? (
@@ -665,8 +674,24 @@ export default function MentorSignals() {
           </div>
 
           <div>
+            <label className="text-sm font-medium">Valid From</label>
+            <Input
+              type="datetime-local"
+              {...register('validFrom')}
+              className="mt-1"
+              min={editingSignal ? (toDateTimeLocal(editingSignal.validFrom) || minDateTime) : minDateTime}
+            />
+            <FieldError error={errors.validFrom} />
+          </div>
+
+          <div>
             <label className="text-sm font-medium">Valid Until</label>
-            <Input type="datetime-local" {...register('validUntil')} className="mt-1" />
+            <Input
+              type="datetime-local"
+              {...register('validUntil')}
+              className="mt-1"
+              min={watch('validFrom') || (editingSignal ? toDateTimeLocal(editingSignal.validFrom) : minDateTime)}
+            />
             <FieldError error={errors.validUntil} />
           </div>
 
