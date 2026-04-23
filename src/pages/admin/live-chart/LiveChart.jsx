@@ -1,18 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Line } from 'react-chartjs-2';
 import Cookies from 'js-cookie';
-import {
-  CategoryScale,
-  Chart as ChartJS,
-  Legend,
-  LineElement,
-  LinearScale,
-  PointElement,
-  Tooltip,
-} from 'chart.js';
+import { ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 const TIMEFRAMES = ['1m', '2m', '5m', '15m'];
 const AUTH_COOKIE_KEY = 'ff_admin_token';
@@ -39,9 +28,10 @@ function toWsUrl(apiBase, token) {
   return `${wsRoot}/api/v1/prediction/stream?token=${encodeURIComponent(token)}`;
 }
 
-function timeLabel(iso) {
-  const dt = new Date(iso);
-  return dt.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+function asUnixSeconds(value) {
+  const ms = new Date(value).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor(ms / 1000);
 }
 
 const LiveChart = () => {
@@ -52,8 +42,13 @@ const LiveChart = () => {
   const [wsStatus, setWsStatus] = useState('idle');
   const [error, setError] = useState('');
   const wsRef = useRef(null);
+  const chartContainerRef = useRef(null);
+  const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
+  const isDark = document.documentElement.classList.contains('dark');
 
   const loadCandles = useCallback(async () => {
     const authToken = Cookies.get(AUTH_COOKIE_KEY);
@@ -159,47 +154,108 @@ const LiveChart = () => {
     return () => disconnectWebSocket();
   }, [timeframe, loadCandles, connectWebSocket, disconnectWebSocket]);
 
-  const labels = candles.map((c) => timeLabel(c.timestamp));
-  const closeValues = candles.map((c) => Number(c.close));
-  const first = closeValues.length ? closeValues[0] : 0;
-  const last = closeValues.length ? closeValues[closeValues.length - 1] : 0;
-  const trendUp = last >= first;
   const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
   const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
 
-  const isDark = document.documentElement.classList.contains('dark');
-  const gridColor = isDark ? '#27272a' : '#e2e8f0';
-  const textColor = isDark ? '#d4d4d8' : '#334155';
+  useEffect(() => {
+    if (!chartContainerRef.current) return undefined;
 
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        label: `BTC (${timeframe})`,
-        data: closeValues,
-        borderColor: trendUp ? '#22c55e' : '#ef4444',
-        backgroundColor: trendUp ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-        pointRadius: 0,
-        tension: 0.25,
-        borderWidth: 2,
-        fill: true,
+    const chart = createChart(chartContainerRef.current, {
+      autoSize: true,
+      layout: {
+        background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
+        textColor: isDark ? '#d4d4d8' : '#334155',
       },
-    ],
-  };
+      grid: {
+        vertLines: { color: isDark ? '#262626' : '#e2e8f0' },
+        horzLines: { color: isDark ? '#262626' : '#e2e8f0' },
+      },
+      crosshair: {
+        vertLine: { color: isDark ? '#52525b' : '#94a3b8' },
+        horzLine: { color: isDark ? '#52525b' : '#94a3b8' },
+      },
+      rightPriceScale: {
+        borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+      },
+      timeScale: {
+        borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { mode: 'index', intersect: false },
-    },
-    scales: {
-      x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 8 } },
-      y: { grid: { color: gridColor }, ticks: { color: textColor } },
-    },
-  };
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: '#22c55e',
+      downColor: '#ef4444',
+      borderVisible: false,
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
+      priceLineVisible: true,
+    });
+
+    const volumeSeries = chart.addHistogramSeries({
+      color: '#64748b',
+      priceFormat: { type: 'volume' },
+      priceScaleId: '',
+    });
+
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.82, bottom: 0 },
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
+    volumeSeriesRef.current = volumeSeries;
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+    };
+  }, [isDark, timeframe]);
+
+  useEffect(() => {
+    if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
+
+    const normalized = candles
+      .map((c) => {
+        const time = asUnixSeconds(c.timestamp);
+        if (time === null) return null;
+        return {
+          time,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
+          volume: Number(c.volume ?? 0),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.time - b.time);
+
+    candleSeriesRef.current.setData(
+      normalized.map((c) => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }))
+    );
+
+    volumeSeriesRef.current.setData(
+      normalized.map((c) => ({
+        time: c.time,
+        value: c.volume,
+        color: c.close >= c.open ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)',
+      }))
+    );
+
+    if (normalized.length && chartRef.current) {
+      chartRef.current.timeScale().fitContent();
+    }
+  }, [candles]);
 
   return (
     <div className="p-4 sm:p-6">
@@ -245,7 +301,7 @@ const LiveChart = () => {
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
         <div className="h-[320px] sm:h-[420px]">
-          <Line data={chartData} options={chartOptions} />
+          <div ref={chartContainerRef} className="h-full w-full" />
         </div>
       </div>
     </div>
