@@ -164,6 +164,7 @@ const LiveChart = () => {
       const chart = createChart(chartContainerRef.current, {
         autoSize: true,
         layout: {
+          attributionLogo: false,
           background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
           textColor: isDark ? '#d4d4d8' : '#334155',
         },
