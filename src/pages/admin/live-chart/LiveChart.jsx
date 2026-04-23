@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
-import { ColorType, createChart } from 'lightweight-charts';
+import { CandlestickSeries, ColorType, HistogramSeries, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 
 const TIMEFRAMES = ['1m', '2m', '5m', '15m'];
@@ -160,55 +160,71 @@ const LiveChart = () => {
   useEffect(() => {
     if (!chartContainerRef.current) return undefined;
 
-    const chart = createChart(chartContainerRef.current, {
-      autoSize: true,
-      layout: {
-        background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
-        textColor: isDark ? '#d4d4d8' : '#334155',
-      },
-      grid: {
-        vertLines: { color: isDark ? '#262626' : '#e2e8f0' },
-        horzLines: { color: isDark ? '#262626' : '#e2e8f0' },
-      },
-      crosshair: {
-        vertLine: { color: isDark ? '#52525b' : '#94a3b8' },
-        horzLine: { color: isDark ? '#52525b' : '#94a3b8' },
-      },
-      rightPriceScale: {
-        borderColor: isDark ? '#3f3f46' : '#cbd5e1',
-      },
-      timeScale: {
-        borderColor: isDark ? '#3f3f46' : '#cbd5e1',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
+    try {
+      const chart = createChart(chartContainerRef.current, {
+        autoSize: true,
+        layout: {
+          background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
+          textColor: isDark ? '#d4d4d8' : '#334155',
+        },
+        grid: {
+          vertLines: { color: isDark ? '#262626' : '#e2e8f0' },
+          horzLines: { color: isDark ? '#262626' : '#e2e8f0' },
+        },
+        crosshair: {
+          vertLine: { color: isDark ? '#52525b' : '#94a3b8' },
+          horzLine: { color: isDark ? '#52525b' : '#94a3b8' },
+        },
+        rightPriceScale: {
+          borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+        },
+        timeScale: {
+          borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
 
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      borderVisible: false,
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444',
-      priceLineVisible: true,
-    });
+      const candleOptions = {
+        upColor: '#22c55e',
+        downColor: '#ef4444',
+        borderVisible: false,
+        wickUpColor: '#22c55e',
+        wickDownColor: '#ef4444',
+        priceLineVisible: true,
+      };
+      const volumeOptions = {
+        color: '#64748b',
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+      };
 
-    const volumeSeries = chart.addHistogramSeries({
-      color: '#64748b',
-      priceFormat: { type: 'volume' },
-      priceScaleId: '',
-    });
+      // Support lightweight-charts v5 (addSeries) and older APIs (addCandlestickSeries/addHistogramSeries).
+      const candleSeries =
+        typeof chart.addCandlestickSeries === 'function'
+          ? chart.addCandlestickSeries(candleOptions)
+          : chart.addSeries(CandlestickSeries, candleOptions);
+      const volumeSeries =
+        typeof chart.addHistogramSeries === 'function'
+          ? chart.addHistogramSeries(volumeOptions)
+          : chart.addSeries(HistogramSeries, volumeOptions);
 
-    volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.82, bottom: 0 },
-    });
+      volumeSeries.priceScale().applyOptions({
+        scaleMargins: { top: 0.82, bottom: 0 },
+      });
 
-    chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
-    volumeSeriesRef.current = volumeSeries;
+      chartRef.current = chart;
+      candleSeriesRef.current = candleSeries;
+      volumeSeriesRef.current = volumeSeries;
+    } catch (chartError) {
+      // Keep UI stable even if chart library init fails.
+      console.error('Failed to initialize trading chart', chartError);
+    }
 
     return () => {
-      chart.remove();
+      if (chartRef.current) {
+        chartRef.current.remove();
+      }
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
