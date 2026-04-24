@@ -38,10 +38,27 @@ function toWsUrl(apiBase, token) {
   return `${wsRoot}/api/v1/prediction/stream?token=${encodeURIComponent(token)}`;
 }
 
+function parseBackendTimestamp(value) {
+  // Backend sends ISO strings without timezone suffix (naive UTC).
+  // Treat them as UTC explicitly to avoid browsers reading as local time.
+  if (typeof value !== 'string') {
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const hasTz = /[Zz]|[+-]\d\d:?\d\d$/.test(value);
+  const normalized = hasTz ? value : `${value}Z`;
+  const ms = new Date(normalized).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function asUnixSeconds(value) {
-  const ms = new Date(value).getTime();
-  if (!Number.isFinite(ms)) return null;
+  const ms = parseBackendTimestamp(value);
+  if (ms === null) return null;
   return Math.floor(ms / 1000);
+}
+
+function isFiniteNumber(value) {
+  return Number.isFinite(Number(value));
 }
 
 function formatIstFromChartTime(time) {
@@ -87,6 +104,11 @@ const LiveChart = () => {
       return;
     }
     setError('');
+    if (selectedView.id === '1s') {
+      // 1s view is built locally from live ticks; skip REST history.
+      setCandles([]);
+      return;
+    }
     try {
       const response = await fetch(
         `${apiBase}/prediction/markets/${asset}/candles?timeframe=${selectedView.apiTimeframe}&limit=${selectedView.limit}`,
@@ -146,14 +168,51 @@ const LiveChart = () => {
         if (
           message.type !== 'priceTick' ||
           message.asset !== asset ||
-          message.timeframe !== selectedView.wsTimeframe ||
-          !message.candle
+          message.timeframe !== selectedView.wsTimeframe
         ) {
           return;
         }
 
-        setLatestPrice(Number(message.price));
+        const price = Number(message.price);
+        if (!Number.isFinite(price)) return;
+        setLatestPrice(price);
+
+        if (selectedView.id === '1s') {
+          // Build a new 1-second candle per wall-clock second from tick stream.
+          const tickMs = parseBackendTimestamp(message.asOf) ?? Date.now();
+          const bucketMs = Math.floor(tickMs / 1000) * 1000;
+          const bucketIso = new Date(bucketMs).toISOString();
+          setCandles((prev) => {
+            const last = prev.length ? prev[prev.length - 1] : null;
+            if (last && last.timestamp === bucketIso) {
+              const updated = {
+                ...last,
+                high: Math.max(Number(last.high), price),
+                low: Math.min(Number(last.low), price),
+                close: price,
+              };
+              const copy = prev.slice(0, -1);
+              copy.push(updated);
+              return copy.slice(-600);
+            }
+            return [
+              ...prev,
+              { timestamp: bucketIso, open: price, high: price, low: price, close: price },
+            ].slice(-600);
+          });
+          return;
+        }
+
+        if (!message.candle) return;
         const candle = message.candle;
+        if (
+          !isFiniteNumber(candle.open) ||
+          !isFiniteNumber(candle.high) ||
+          !isFiniteNumber(candle.low) ||
+          !isFiniteNumber(candle.close)
+        ) {
+          return;
+        }
         setCandles((prev) => {
           const next = [...prev];
           const idx = next.findIndex((c) => c.timestamp === candle.timestamp);
@@ -279,41 +338,62 @@ const LiveChart = () => {
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
 
-    const normalized = candles
+    const mapped = candles
       .map((c) => {
         const time = asUnixSeconds(c.timestamp);
         if (time === null) return null;
+        if (
+          !isFiniteNumber(c.open) ||
+          !isFiniteNumber(c.high) ||
+          !isFiniteNumber(c.low) ||
+          !isFiniteNumber(c.close)
+        ) {
+          return null;
+        }
         return {
           time,
           open: Number(c.open),
           high: Number(c.high),
           low: Number(c.low),
           close: Number(c.close),
-          volume: Number(c.volume ?? 0),
+          volume: isFiniteNumber(c.volume) ? Number(c.volume) : 0,
         };
       })
       .filter(Boolean)
       .sort((a, b) => a.time - b.time);
 
-    candleSeriesRef.current.setData(
-      normalized.map((c) => ({
-        time: c.time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }))
-    );
+    const deduped = [];
+    for (const row of mapped) {
+      if (deduped.length && deduped[deduped.length - 1].time === row.time) {
+        deduped[deduped.length - 1] = row;
+      } else {
+        deduped.push(row);
+      }
+    }
 
-    volumeSeriesRef.current.setData(
-      normalized.map((c) => ({
-        time: c.time,
-        value: c.volume,
-        color: c.close >= c.open ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)',
-      }))
-    );
+    try {
+      candleSeriesRef.current.setData(
+        deduped.map((c) => ({
+          time: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }))
+      );
+      volumeSeriesRef.current.setData(
+        deduped.map((c) => ({
+          time: c.time,
+          value: c.volume,
+          color: c.close >= c.open ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)',
+        }))
+      );
+    } catch (updateError) {
+      console.error('Chart setData failed', updateError);
+      return;
+    }
 
-    if (normalized.length && chartRef.current && shouldAutoFitRef.current) {
+    if (deduped.length && chartRef.current && shouldAutoFitRef.current) {
       chartRef.current.timeScale().fitContent();
       chartRef.current.timeScale().scrollToRealTime();
       shouldAutoFitRef.current = false;
