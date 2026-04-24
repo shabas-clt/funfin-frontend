@@ -61,14 +61,75 @@ function isFiniteNumber(value) {
   return Number.isFinite(Number(value));
 }
 
-function formatIstFromChartTime(time) {
+function appendTickToOneSecondCandles(prev, tickPrice, tickMs) {
+  const bucketMs = Math.floor(tickMs / 1000) * 1000;
+  const bucketIso = new Date(bucketMs).toISOString();
+  const price = Number(tickPrice);
+  if (!Number.isFinite(price)) return prev;
+
+  if (!prev.length) {
+    return [
+      {
+        timestamp: bucketIso,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume: 1,
+      },
+    ];
+  }
+
+  const next = [...prev];
+  const last = next[next.length - 1];
+  const lastMs = parseBackendTimestamp(last.timestamp);
+  if (lastMs === null) return prev;
+
+  if (bucketMs === lastMs) {
+    next[next.length - 1] = {
+      ...last,
+      high: Math.max(Number(last.high), price),
+      low: Math.min(Number(last.low), price),
+      close: price,
+      volume: (Number(last.volume) || 0) + 1,
+    };
+    return next.slice(-600);
+  }
+
+  // Fill any missing seconds with flat candles (terminal-like continuity).
+  let cursor = lastMs + 1000;
+  let prevClose = Number(last.close);
+  while (cursor < bucketMs) {
+    const flatIso = new Date(cursor).toISOString();
+    next.push({
+      timestamp: flatIso,
+      open: prevClose,
+      high: prevClose,
+      low: prevClose,
+      close: prevClose,
+      volume: 0,
+    });
+    cursor += 1000;
+  }
+
+  next.push({
+    timestamp: bucketIso,
+    open: prevClose,
+    high: Math.max(prevClose, price),
+    low: Math.min(prevClose, price),
+    close: price,
+    volume: 1,
+  });
+  return next.slice(-600);
+}
+
+function formatLocalFromChartTime(time, showSeconds = true) {
   if (typeof time !== 'number') return '';
   return new Date(time * 1000).toLocaleTimeString('en-IN', {
-    timeZone: 'Asia/Kolkata',
     hour12: false,
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
+    ...(showSeconds ? { second: '2-digit' } : {}),
   });
 }
 
@@ -178,29 +239,9 @@ const LiveChart = () => {
         setLatestPrice(price);
 
         if (selectedView.id === '1s') {
-          // Build a new 1-second candle per wall-clock second from tick stream.
+          // Build terminal-style 1-second candles directly from ticks.
           const tickMs = parseBackendTimestamp(message.asOf) ?? Date.now();
-          const bucketMs = Math.floor(tickMs / 1000) * 1000;
-          const bucketIso = new Date(bucketMs).toISOString();
-          setCandles((prev) => {
-            const last = prev.length ? prev[prev.length - 1] : null;
-            if (last && last.timestamp === bucketIso) {
-              const updated = {
-                ...last,
-                high: Math.max(Number(last.high), price),
-                low: Math.min(Number(last.low), price),
-                close: price,
-                volume: (Number(last.volume) || 0) + 1, // Add tick count as volume
-              };
-              const copy = prev.slice(0, -1);
-              copy.push(updated);
-              return copy.slice(-600);
-            }
-            return [
-              ...prev,
-              { timestamp: bucketIso, open: price, high: price, low: price, close: price, volume: 1 },
-            ].slice(-600);
-          });
+          setCandles((prev) => appendTickToOneSecondCandles(prev, price, tickMs));
           return;
         }
 
@@ -261,8 +302,9 @@ const LiveChart = () => {
       const chart = createChart(chartContainerRef.current, {
         autoSize: true,
         localization: {
-          // Force chart tick labels to Indian Standard Time.
-          timeFormatter: formatIstFromChartTime,
+          // Keep chart labels aligned with user's local system clock.
+          timeFormatter: (time) => formatLocalFromChartTime(time, selectedView.secondsVisible),
+          tickMarkFormatter: (time) => formatLocalFromChartTime(time, selectedView.secondsVisible),
         },
         layout: {
           attributionLogo: false,
@@ -277,8 +319,20 @@ const LiveChart = () => {
           vertLine: { color: isDark ? '#52525b' : '#94a3b8' },
           horzLine: { color: isDark ? '#52525b' : '#94a3b8' },
         },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false,
+        },
+        handleScale: {
+          axisPressedMouseMove: true,
+          mouseWheel: true,
+          pinch: true,
+        },
         rightPriceScale: {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+          autoScale: true,
         },
         timeScale: {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
@@ -353,47 +407,12 @@ const LiveChart = () => {
           return null;
         }
         
-        const open = Number(c.open);
-        const close = Number(c.close);
-        const high = Number(c.high);
-        const low = Number(c.low);
-        
-        // Ensure minimum candle body size to prevent dot-like appearance
-        // If open equals close, create a small body in the direction of the price movement
-        let adjustedOpen = open;
-        let adjustedClose = close;
-        let adjustedHigh = high;
-        let adjustedLow = low;
-        
-        if (Math.abs(open - close) < 0.0001) { // Essentially no price movement
-          const pricePoint = open;
-          const minBodySize = pricePoint * 0.0001; // 0.01% minimum body size
-          
-          if (high > pricePoint) {
-            // Price went up during the period
-            adjustedOpen = pricePoint;
-            adjustedClose = pricePoint + minBodySize;
-          } else if (low < pricePoint) {
-            // Price went down during the period  
-            adjustedOpen = pricePoint + minBodySize;
-            adjustedClose = pricePoint;
-          } else {
-            // No movement, create tiny up candle
-            adjustedOpen = pricePoint;
-            adjustedClose = pricePoint + minBodySize;
-          }
-          
-          // Ensure high/low encompass the body
-          adjustedHigh = Math.max(adjustedHigh, adjustedOpen, adjustedClose);
-          adjustedLow = Math.min(adjustedLow, adjustedOpen, adjustedClose);
-        }
-        
         return {
           time,
-          open: adjustedOpen,
-          high: adjustedHigh,
-          low: adjustedLow,
-          close: adjustedClose,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
           volume: isFiniteNumber(c.volume) ? Number(c.volume) : 0,
         };
       })
@@ -423,7 +442,12 @@ const LiveChart = () => {
         deduped.map((c) => ({
           time: c.time,
           value: c.volume,
-          color: c.close >= c.open ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)',
+          color:
+            c.close > c.open
+              ? 'rgba(34,197,94,0.45)'
+              : c.close < c.open
+                ? 'rgba(239,68,68,0.45)'
+                : 'rgba(100,116,139,0.45)',
         }))
       );
     } catch (updateError) {
