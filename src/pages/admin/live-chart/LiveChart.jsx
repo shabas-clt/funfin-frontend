@@ -3,7 +3,17 @@ import Cookies from 'js-cookie';
 import { CandlestickSeries, ColorType, HistogramSeries, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 
-const TIMEFRAMES = ['1m', '2m', '5m', '15m'];
+const ASSETS = [
+  { value: 'bitcoin', label: 'BTC/USD' },
+  { value: 'gold', label: 'XAU/USD' },
+  { value: 'silver', label: 'XAG/USD' },
+];
+const VIEW_OPTIONS = [
+  { id: '1s', label: '1s', apiTimeframe: '1m', wsTimeframe: '1m', limit: 120, secondsVisible: true },
+  { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 90, secondsVisible: false },
+  { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 80, secondsVisible: false },
+  { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 80, secondsVisible: false },
+];
 const AUTH_COOKIE_KEY = 'ff_admin_token';
 
 function getClientApiBaseUrl() {
@@ -34,9 +44,20 @@ function asUnixSeconds(value) {
   return Math.floor(ms / 1000);
 }
 
+function formatIstFromChartTime(time) {
+  if (typeof time !== 'number') return '';
+  return new Date(time * 1000).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 const LiveChart = () => {
-  const [asset] = useState('bitcoin');
-  const [timeframe, setTimeframe] = useState('1m');
+  const [asset, setAsset] = useState('bitcoin');
+  const [viewId, setViewId] = useState('1s');
   const [candles, setCandles] = useState([]);
   const [latestPrice, setLatestPrice] = useState(null);
   const [wsStatus, setWsStatus] = useState('idle');
@@ -49,6 +70,10 @@ const LiveChart = () => {
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const isDark = document.documentElement.classList.contains('dark');
+  const selectedView = useMemo(
+    () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
+    [viewId]
+  );
 
   const loadCandles = useCallback(async () => {
     const authToken = Cookies.get(AUTH_COOKIE_KEY);
@@ -59,7 +84,7 @@ const LiveChart = () => {
     setError('');
     try {
       const response = await fetch(
-        `${apiBase}/prediction/markets/${asset}/candles?timeframe=${timeframe}&limit=60`,
+        `${apiBase}/prediction/markets/${asset}/candles?timeframe=${selectedView.apiTimeframe}&limit=${selectedView.limit}`,
         {
           headers: { Authorization: `Bearer ${authToken}` },
         }
@@ -72,7 +97,7 @@ const LiveChart = () => {
     } catch (err) {
       setError(err?.message || 'Unable to fetch candle history');
     }
-  }, [apiBase, asset, timeframe]);
+  }, [apiBase, asset, selectedView]);
 
   const disconnectWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -97,7 +122,7 @@ const LiveChart = () => {
 
     ws.onopen = () => {
       setWsStatus('connected');
-      ws.send(JSON.stringify({ type: 'subscribe', asset, timeframe }));
+      ws.send(JSON.stringify({ type: 'subscribe', asset, timeframe: selectedView.wsTimeframe }));
     };
 
     ws.onmessage = (event) => {
@@ -113,7 +138,14 @@ const LiveChart = () => {
           }
           return;
         }
-        if (message.type !== 'priceTick' || message.asset !== asset || !message.candle) return;
+        if (
+          message.type !== 'priceTick' ||
+          message.asset !== asset ||
+          message.timeframe !== selectedView.wsTimeframe ||
+          !message.candle
+        ) {
+          return;
+        }
 
         setLatestPrice(Number(message.price));
         const candle = message.candle;
@@ -139,7 +171,7 @@ const LiveChart = () => {
     ws.onclose = () => {
       setWsStatus('disconnected');
     };
-  }, [apiBase, asset, timeframe, disconnectWebSocket]);
+  }, [apiBase, asset, selectedView, disconnectWebSocket]);
 
   useEffect(() => {
     const authToken = Cookies.get(AUTH_COOKIE_KEY);
@@ -152,7 +184,7 @@ const LiveChart = () => {
     connectWebSocket();
 
     return () => disconnectWebSocket();
-  }, [timeframe, loadCandles, connectWebSocket, disconnectWebSocket]);
+  }, [asset, viewId, loadCandles, connectWebSocket, disconnectWebSocket]);
 
   const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
   const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
@@ -163,6 +195,10 @@ const LiveChart = () => {
     try {
       const chart = createChart(chartContainerRef.current, {
         autoSize: true,
+        localization: {
+          // Force chart tick labels to Indian Standard Time.
+          timeFormatter: formatIstFromChartTime,
+        },
         layout: {
           attributionLogo: false,
           background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
@@ -182,7 +218,7 @@ const LiveChart = () => {
         timeScale: {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
           timeVisible: true,
-          secondsVisible: false,
+          secondsVisible: selectedView.secondsVisible,
         },
       });
 
@@ -230,7 +266,7 @@ const LiveChart = () => {
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
     };
-  }, [isDark, timeframe]);
+  }, [isDark, selectedView.secondsVisible]);
 
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
@@ -279,9 +315,11 @@ const LiveChart = () => {
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Live BTC Chart</h1>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
+              Live Market Chart
+            </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Backend stream monitor for Flutter implementation reference.
+              Tiingo live feed routed through FastAPI websocket.
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -298,18 +336,34 @@ const LiveChart = () => {
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2">
-            {TIMEFRAMES.map((tf) => (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {ASSETS.map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setAsset(item.value)}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                asset === item.value
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+            {VIEW_OPTIONS.map((option) => (
               <button
-                key={tf}
-                onClick={() => setTimeframe(tf)}
+                key={option.id}
+                onClick={() => setViewId(option.id)}
                 className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                  timeframe === tf
+                  viewId === option.id
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
                 }`}
               >
-                {tf}
+                {option.label}
               </button>
             ))}
         </div>
