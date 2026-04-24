@@ -9,10 +9,10 @@ const ASSETS = [
   { value: 'silver', label: 'XAG/USD' },
 ];
 const VIEW_OPTIONS = [
-  { id: '1s', label: '1s', apiTimeframe: '1m', wsTimeframe: '1m', limit: 120, secondsVisible: true },
-  { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 90, secondsVisible: false },
-  { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 80, secondsVisible: false },
-  { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 80, secondsVisible: false },
+  { id: '1s', label: '1s', apiTimeframe: '1m', wsTimeframe: '1m', limit: 320, secondsVisible: true },
+  { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 300, secondsVisible: false },
+  { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 220, secondsVisible: false },
+  { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
 ];
 const AUTH_COOKIE_KEY = 'ff_admin_token';
 
@@ -67,6 +67,7 @@ const LiveChart = () => {
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
+  const shouldAutoFitRef = useRef(true);
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const isDark = document.documentElement.classList.contains('dark');
@@ -74,6 +75,10 @@ const LiveChart = () => {
     () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
     [viewId]
   );
+
+  useEffect(() => {
+    shouldAutoFitRef.current = true;
+  }, [asset, viewId]);
 
   const loadCandles = useCallback(async () => {
     const authToken = Cookies.get(AUTH_COOKIE_KEY);
@@ -157,7 +162,7 @@ const LiveChart = () => {
           } else {
             next.push(candle);
           }
-          return next.slice(-100);
+          return next.slice(-600);
         });
       } catch {
         // Ignore malformed event payloads.
@@ -219,6 +224,9 @@ const LiveChart = () => {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
           timeVisible: true,
           secondsVisible: selectedView.secondsVisible,
+          rightOffset: 6,
+          barSpacing: 7,
+          minBarSpacing: 3,
         },
       });
 
@@ -305,8 +313,10 @@ const LiveChart = () => {
       }))
     );
 
-    if (normalized.length && chartRef.current) {
+    if (normalized.length && chartRef.current && shouldAutoFitRef.current) {
       chartRef.current.timeScale().fitContent();
+      chartRef.current.timeScale().scrollToRealTime();
+      shouldAutoFitRef.current = false;
     }
   }, [candles]);
 
