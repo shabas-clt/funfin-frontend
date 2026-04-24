@@ -190,6 +190,7 @@ const LiveChart = () => {
                 high: Math.max(Number(last.high), price),
                 low: Math.min(Number(last.low), price),
                 close: price,
+                volume: (Number(last.volume) || 0) + 1, // Add tick count as volume
               };
               const copy = prev.slice(0, -1);
               copy.push(updated);
@@ -197,7 +198,7 @@ const LiveChart = () => {
             }
             return [
               ...prev,
-              { timestamp: bucketIso, open: price, high: price, low: price, close: price },
+              { timestamp: bucketIso, open: price, high: price, low: price, close: price, volume: 1 },
             ].slice(-600);
           });
           return;
@@ -284,15 +285,16 @@ const LiveChart = () => {
           timeVisible: true,
           secondsVisible: selectedView.secondsVisible,
           rightOffset: 6,
-          barSpacing: 7,
-          minBarSpacing: 3,
+          barSpacing: 10,
+          minBarSpacing: 5,
         },
       });
 
       const candleOptions = {
         upColor: '#22c55e',
         downColor: '#ef4444',
-        borderVisible: false,
+        borderVisible: true,
+        borderColor: isDark ? '#52525b' : '#94a3b8',
         wickUpColor: '#22c55e',
         wickDownColor: '#ef4444',
         priceLineVisible: true,
@@ -350,12 +352,48 @@ const LiveChart = () => {
         ) {
           return null;
         }
+        
+        const open = Number(c.open);
+        const close = Number(c.close);
+        const high = Number(c.high);
+        const low = Number(c.low);
+        
+        // Ensure minimum candle body size to prevent dot-like appearance
+        // If open equals close, create a small body in the direction of the price movement
+        let adjustedOpen = open;
+        let adjustedClose = close;
+        let adjustedHigh = high;
+        let adjustedLow = low;
+        
+        if (Math.abs(open - close) < 0.0001) { // Essentially no price movement
+          const pricePoint = open;
+          const minBodySize = pricePoint * 0.0001; // 0.01% minimum body size
+          
+          if (high > pricePoint) {
+            // Price went up during the period
+            adjustedOpen = pricePoint;
+            adjustedClose = pricePoint + minBodySize;
+          } else if (low < pricePoint) {
+            // Price went down during the period  
+            adjustedOpen = pricePoint + minBodySize;
+            adjustedClose = pricePoint;
+          } else {
+            // No movement, create tiny up candle
+            adjustedOpen = pricePoint;
+            adjustedClose = pricePoint + minBodySize;
+          }
+          
+          // Ensure high/low encompass the body
+          adjustedHigh = Math.max(adjustedHigh, adjustedOpen, adjustedClose);
+          adjustedLow = Math.min(adjustedLow, adjustedOpen, adjustedClose);
+        }
+        
         return {
           time,
-          open: Number(c.open),
-          high: Number(c.high),
-          low: Number(c.low),
-          close: Number(c.close),
+          open: adjustedOpen,
+          high: adjustedHigh,
+          low: adjustedLow,
+          close: adjustedClose,
           volume: isFiniteNumber(c.volume) ? Number(c.volume) : 0,
         };
       })
