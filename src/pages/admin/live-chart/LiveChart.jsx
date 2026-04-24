@@ -61,6 +61,25 @@ function isFiniteNumber(value) {
   return Number.isFinite(Number(value));
 }
 
+function buildSeedOneSecondCandles(lastPrice, nowMs, size = 120) {
+  const price = Number(lastPrice);
+  if (!Number.isFinite(price)) return [];
+  const endMs = Math.floor(nowMs / 1000) * 1000;
+  const startMs = endMs - (size - 1) * 1000;
+  const seeded = [];
+  for (let t = startMs; t <= endMs; t += 1000) {
+    seeded.push({
+      timestamp: new Date(t).toISOString(),
+      open: price,
+      high: price,
+      low: price,
+      close: price,
+      volume: 0,
+    });
+  }
+  return seeded;
+}
+
 function appendTickToOneSecondCandles(prev, tickPrice, tickMs) {
   const bucketMs = Math.floor(tickMs / 1000) * 1000;
   const bucketIso = new Date(bucketMs).toISOString();
@@ -223,6 +242,12 @@ const LiveChart = () => {
         if (message.type === 'subscribed') {
           if (typeof message.price === 'number') {
             setLatestPrice(message.price);
+            if (selectedView.id === '1s') {
+              // Seed initial context so 1s view doesn't look empty/blocky on open.
+              setCandles((prev) =>
+                prev.length ? prev : buildSeedOneSecondCandles(message.price, Date.now(), 120)
+              );
+            }
           }
           return;
         }
@@ -304,7 +329,6 @@ const LiveChart = () => {
         localization: {
           // Keep chart labels aligned with user's local system clock.
           timeFormatter: (time) => formatLocalFromChartTime(time, selectedView.secondsVisible),
-          tickMarkFormatter: (time) => formatLocalFromChartTime(time, selectedView.secondsVisible),
         },
         layout: {
           attributionLogo: false,
@@ -338,9 +362,11 @@ const LiveChart = () => {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
           timeVisible: true,
           secondsVisible: selectedView.secondsVisible,
+          tickMarkFormatter: (time) =>
+            formatLocalFromChartTime(time, selectedView.secondsVisible),
           rightOffset: 6,
-          barSpacing: 10,
-          minBarSpacing: 5,
+          barSpacing: selectedView.id === '1s' ? 7 : 10,
+          minBarSpacing: selectedView.id === '1s' ? 3 : 5,
         },
       });
 
@@ -389,7 +415,7 @@ const LiveChart = () => {
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
     };
-  }, [isDark, selectedView.secondsVisible]);
+  }, [isDark, selectedView.id, selectedView.secondsVisible]);
 
   useEffect(() => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
