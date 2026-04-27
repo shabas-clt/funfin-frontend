@@ -184,14 +184,33 @@ const TokenUsageBar = ({ token }) => {
     return 'bg-green-500';
   };
 
+  const formatSyncTime = (timestamp) => {
+    if (!timestamp) return 'Never';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return date.toLocaleDateString();
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-2">
           <span className="font-medium text-slate-900 dark:text-white">{token.name}</span>
           {token.assigned_to && (
-            <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">
+            <span className="text-sm text-slate-500 dark:text-slate-400">
               ({token.assigned_to})
+            </span>
+          )}
+          {token.last_synced_with_tiingo && (
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              • Synced {formatSyncTime(token.last_synced_with_tiingo)}
             </span>
           )}
         </div>
