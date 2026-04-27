@@ -55,8 +55,8 @@ export default function LiveEngineDashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">
             Live Engine Dashboard
           </h1>
@@ -67,10 +67,10 @@ export default function LiveEngineDashboard() {
         <Button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10"
+          className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-3 sm:px-4 h-9 sm:h-10 text-sm sm:text-base flex-shrink-0"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
+          <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
         </Button>
       </div>
 
