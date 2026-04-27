@@ -9,7 +9,7 @@ const ASSETS = [
   { value: 'silver', label: 'XAG/USD' },
 ];
 const VIEW_OPTIONS = [
-  { id: '1s', label: '1s', apiTimeframe: '1m', wsTimeframe: '1m', limit: 320, secondsVisible: true },
+  { id: '1s', label: '1s', apiTimeframe: '1s', wsTimeframe: '1s', limit: 320, secondsVisible: true },
   { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 300, secondsVisible: false },
   { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 220, secondsVisible: false },
   { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
