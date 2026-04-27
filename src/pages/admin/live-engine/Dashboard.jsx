@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Activity, Database, Key, TrendingUp } from 'lucide-react';
+import { Activity, Database, Key, TrendingUp, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { TableSkeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 
@@ -9,15 +9,20 @@ export default function LiveEngineDashboard() {
   const [health, setHealth] = useState(null);
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Refresh every 5s
-    return () => clearInterval(interval);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
     try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
       const [healthRes, statsRes] = await Promise.all([
         api.get('/live-engine/health'),
         api.get('/live-engine/tokens/stats'),
@@ -28,7 +33,12 @@ export default function LiveEngineDashboard() {
       toast.error('Failed to fetch live engine data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchData(true);
   };
 
   if (loading) {
@@ -45,13 +55,23 @@ export default function LiveEngineDashboard() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">
-          Live Engine Dashboard
-        </h1>
-        <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">
-          Monitor your data engine performance and token usage
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">
+            Live Engine Dashboard
+          </h1>
+          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">
+            Monitor your data engine performance and token usage
+          </p>
+        </div>
+        <Button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="bg-[#6366f1] hover:bg-indigo-600 text-white shadow-sm flex items-center gap-2 px-4 h-10"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -77,8 +97,8 @@ export default function LiveEngineDashboard() {
         <StatCard
           icon={Database}
           label="Database"
-          value={health?.database?.timescaledb === 'connected' ? 'Connected' : 'Disconnected'}
-          color={health?.database?.timescaledb === 'connected' ? 'green' : 'red'}
+          value={health?.database?.postgresql === 'connected' ? 'Connected' : 'Disconnected'}
+          color={health?.database?.postgresql === 'connected' ? 'green' : 'red'}
         />
       </div>
 
