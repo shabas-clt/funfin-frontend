@@ -15,6 +15,8 @@ import CourseProgress from '../pages/admin/courses/CourseProgress';
 import GamificationManagement from '../pages/admin/gamification/GamificationManagement';
 import NotificationBroadcast from '../pages/admin/notifications/NotificationBroadcast';
 import LiveChart from '../pages/admin/live-chart/LiveChart';
+import LiveEngineDashboard from '../pages/admin/live-engine/Dashboard';
+import TokenManagement from '../pages/admin/live-engine/TokenManagement';
 import MentorDashboard from '../pages/mentor/dashboard/MentorDashboard';
 import MentorSignals from '../pages/mentor/signals/MentorSignals';
 import SignIn from '../pages/auth/SignIn';
@@ -46,6 +48,8 @@ const AppRoutes = () => {
             <Route path="notifications" element={<PageTransition><NotificationBroadcast /></PageTransition>} />
             <Route path="signals" element={<PageTransition><MentorSignals /></PageTransition>} />
             <Route path="live-chart" element={<PageTransition><LiveChart /></PageTransition>} />
+            <Route path="live-engine/dashboard" element={<PageTransition><LiveEngineDashboard /></PageTransition>} />
+            <Route path="live-engine/tokens" element={<PageTransition><TokenManagement /></PageTransition>} />
           </Route>
         </Route>
 
