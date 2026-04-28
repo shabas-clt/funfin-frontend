@@ -30,6 +30,14 @@ function getClientApiBaseUrl() {
   return adminApi;
 }
 
+function getLiveEngineUrl() {
+  const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  
+  // Default to localhost for development
+  return 'http://localhost:8001';
+}
+
 function toWsUrl(apiBase, token) {
   const root = apiBase.replace(/\/api\/v1\/?$/, '');
   const wsRoot = root.startsWith('https://')
@@ -167,6 +175,7 @@ const LiveChart = () => {
   const shouldAutoFitRef = useRef(true);
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
+  const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
   const isDark = document.documentElement.classList.contains('dark');
   const selectedView = useMemo(
     () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
@@ -178,11 +187,6 @@ const LiveChart = () => {
   }, [asset, viewId]);
 
   const loadCandles = useCallback(async () => {
-    const authToken = Cookies.get(AUTH_COOKIE_KEY);
-    if (!authToken) {
-      setError('Admin auth token not found. Please log in again.');
-      return;
-    }
     setError('');
     if (selectedView.id === '1s') {
       // 1s view is built locally from live ticks; skip REST history.
@@ -190,21 +194,34 @@ const LiveChart = () => {
       return;
     }
     try {
+      // Fetch historical candles from live-engine API
       const response = await fetch(
-        `${apiBase}/prediction/markets/${asset}/candles?timeframe=${selectedView.apiTimeframe}&limit=${selectedView.limit}`,
-        {
-          headers: { Authorization: `Bearer ${authToken}` },
-        }
+        `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`
       );
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload?.detail || 'Failed to load candles');
       }
-      setCandles(Array.isArray(payload?.candles) ? payload.candles : []);
+      
+      // live-engine returns array of candles with "time" field
+      if (Array.isArray(payload)) {
+        // Map "time" to "timestamp" for compatibility
+        const mappedCandles = payload.map(c => ({
+          timestamp: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume || 0,
+        }));
+        setCandles(mappedCandles);
+      } else {
+        setCandles([]);
+      }
     } catch (err) {
       setError(err?.message || 'Unable to fetch candle history');
     }
-  }, [apiBase, asset, selectedView]);
+  }, [liveEngineUrl, asset, selectedView]);
 
   const disconnectWebSocket = useCallback(() => {
     if (wsRef.current) {
