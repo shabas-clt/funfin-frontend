@@ -1,10 +1,17 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Loader2, Plus, Save, Edit2, Calendar } from 'lucide-react';
+import { Loader2, Plus, Save, Edit2, Calendar, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { formatShortDate } from '@/lib/format';
+import ChallengeTypeSelector from '../../../components/admin/gamification/ChallengeTypeSelector';
+import ConditionalChallengeFields from '../../../components/admin/gamification/ConditionalChallengeFields';
+import { 
+  weeklyChallengeSchema, 
+  specialChallengeSchema, 
+  dailyChallengeSchema 
+} from '../../../lib/validators/challengeValidators';
 
 const PAGE_SIZE = 20;
 
@@ -13,12 +20,55 @@ const PAGE_SIZE = 20;
 // option rows and a correct-option radio group.
 
 function ChallengeEditor({ initial, busy, onSave, onCancel }) {
+  const [challengeType, setChallengeType] = useState(initial.challengeType || 'daily');
   const [question, setQuestion] = useState(initial.question || '');
   const [options, setOptions] = useState(initial.options || ['', '']);
   const [correctIndex, setCorrectIndex] = useState(initial.correctOptionIndex ?? 0);
   const [explanation, setExplanation] = useState(initial.explanation || '');
   const [rewardCoins, setRewardCoins] = useState(initial.rewardCoins ?? 0);
   const [isActive, setIsActive] = useState(initial.isActive ?? true);
+  const [typeSpecificFields, setTypeSpecificFields] = useState({
+    challengeDate: initial.challengeDate || '',
+    weekNumber: initial.weekNumber || new Date().getWeek(),
+    weekYear: initial.weekYear || new Date().getFullYear(),
+    startDate: initial.startDate || '',
+    endDate: initial.endDate || ''
+  });
+  const [validationErrors, setValidationErrors] = useState({});
+
+  // Add week number calculation to Date prototype if not exists
+  if (!Date.prototype.getWeek) {
+    Date.prototype.getWeek = function() {
+      const start = new Date(this.getFullYear(), 0, 1);
+      const days = Math.floor((this - start) / (24 * 60 * 60 * 1000));
+      return Math.ceil((days + start.getDay() + 1) / 7);
+    };
+  }
+
+  const validateTypeSpecificFields = async () => {
+    try {
+      setValidationErrors({});
+      
+      if (challengeType === 'weekly') {
+        await weeklyChallengeSchema.validate(typeSpecificFields, { abortEarly: false });
+      } else if (challengeType === 'special') {
+        await specialChallengeSchema.validate(typeSpecificFields, { abortEarly: false });
+      } else if (challengeType === 'daily') {
+        await dailyChallengeSchema.validate(typeSpecificFields, { abortEarly: false });
+      }
+      
+      return true;
+    } catch (error) {
+      if (error.inner) {
+        const errors = {};
+        error.inner.forEach(err => {
+          errors[err.path] = err.message;
+        });
+        setValidationErrors(errors);
+      }
+      return false;
+    }
+  };
 
   const addOption = () => setOptions((prev) => [...prev, '']);
   const removeOption = (idx) => {
@@ -29,25 +79,50 @@ function ChallengeEditor({ initial, busy, onSave, onCancel }) {
     setOptions((prev) => prev.map((o, i) => (i === idx ? value : o)));
   };
 
-  const submit = () => {
+  const submit = async () => {
     if ((question || '').length < 5) return toast.error('Question must be at least 5 characters');
     const cleanOptions = options.map((o) => String(o || '').trim()).filter(Boolean);
     if (cleanOptions.length < 2) return toast.error('At least two non-empty options are required');
     if (correctIndex >= cleanOptions.length)
       return toast.error('Correct option must point to a valid option');
 
-    onSave({
+    // Validate type-specific fields
+    const isValid = await validateTypeSpecificFields();
+    if (!isValid) {
+      toast.error('Please fix the validation errors');
+      return;
+    }
+
+    const payload = {
+      challengeType,
       question: question.trim(),
       options: cleanOptions,
       correctOptionIndex: Number(correctIndex),
       explanation: explanation.trim() || null,
       rewardCoins: Number(rewardCoins) || 0,
       isActive,
-    });
+      ...typeSpecificFields
+    };
+
+    onSave(payload);
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <ChallengeTypeSelector
+        value={challengeType}
+        onChange={setChallengeType}
+        disabled={busy}
+      />
+
+      <ConditionalChallengeFields
+        challengeType={challengeType}
+        values={typeSpecificFields}
+        onChange={setTypeSpecificFields}
+        errors={validationErrors}
+        disabled={busy}
+      />
+
       <div>
         <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Question</label>
         <textarea
@@ -157,13 +232,17 @@ export default function ChallengesTab() {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [challengeTypeFilter, setChallengeTypeFilter] = useState('');
 
   const load = useCallback(async (nextSkip = 0) => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/gamification/challenges', {
-        params: { skip: nextSkip, limit: PAGE_SIZE },
-      });
+      const params = { skip: nextSkip, limit: PAGE_SIZE };
+      if (challengeTypeFilter) {
+        params.challengeType = challengeTypeFilter;
+      }
+      
+      const res = await api.get('/admin/gamification/challenges', { params });
       setRows(res.items || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
@@ -172,7 +251,7 @@ export default function ChallengesTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [challengeTypeFilter]);
 
   useEffect(() => {
     load(0);
@@ -208,30 +287,70 @@ export default function ChallengesTab() {
   };
 
   const handleAssign = async (row) => {
-    const { value: picked } = await Swal.fire({
-      title: 'Assign challenge to a date',
-      html: `
-        <p class="text-sm">${row.question}</p>
-      `,
-      input: 'date',
-      inputValue: (row.challengeDate || '').slice(0, 10),
-      showCancelButton: true,
-      confirmButtonColor: '#6366f1',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'Assign',
-    });
-    if (!picked) return;
-    try {
-      await api.post(`/admin/gamification/challenges/${row.id}/assign-today`, {
-        challengeDate: picked,
-      });
-      toast.success(`Assigned to ${picked}`);
-      setRows((prev) =>
-        prev.map((r) => (r.id === row.id ? { ...r, challengeDate: picked } : r)),
-      );
-    } catch (err) {
-      toast.error(typeof err === 'string' ? err : 'Failed to assign date');
+    let inputHtml = '';
+    let inputValue = '';
+    
+    if (row.challengeType === 'daily') {
+      inputHtml = '<p class="text-sm mb-2">Assign challenge to a specific date:</p>';
+      inputValue = (row.challengeDate || '').slice(0, 10);
+    } else if (row.challengeType === 'weekly') {
+      inputHtml = `<p class="text-sm mb-2">This is a weekly challenge for Week ${row.weekNumber}, ${row.weekYear}</p>`;
+    } else if (row.challengeType === 'special') {
+      inputHtml = `<p class="text-sm mb-2">This is a special challenge running from ${row.startDate} to ${row.endDate}</p>`;
     }
+
+    if (row.challengeType === 'daily') {
+      const { value: picked } = await Swal.fire({
+        title: 'Assign challenge to a date',
+        html: `${inputHtml}<p class="text-sm">${row.question}</p>`,
+        input: 'date',
+        inputValue,
+        showCancelButton: true,
+        confirmButtonColor: '#6366f1',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Assign',
+      });
+      if (!picked) return;
+      
+      try {
+        await api.post(`/admin/gamification/challenges/${row.id}/assign-today`, {
+          challengeDate: picked,
+        });
+        toast.success(`Assigned to ${picked}`);
+        setRows((prev) =>
+          prev.map((r) => (r.id === row.id ? { ...r, challengeDate: picked } : r)),
+        );
+      } catch (err) {
+        toast.error(typeof err === 'string' ? err : 'Failed to assign date');
+      }
+    } else {
+      Swal.fire({
+        title: 'Challenge Info',
+        html: `${inputHtml}<p class="text-sm mt-2">${row.question}</p>`,
+        confirmButtonColor: '#6366f1',
+        confirmButtonText: 'OK',
+      });
+    }
+  };
+
+  const getChallengeTypeDisplay = (row) => {
+    if (row.challengeType === 'weekly') {
+      return `Week ${row.weekNumber}, ${row.weekYear}`;
+    } else if (row.challengeType === 'special') {
+      return `${row.startDate} to ${row.endDate}`;
+    } else {
+      return row.challengeDate ? formatShortDate(row.challengeDate) : 'unassigned';
+    }
+  };
+
+  const getChallengeTypeBadge = (type) => {
+    const badges = {
+      daily: 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400',
+      weekly: 'bg-purple-50 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400',
+      special: 'bg-orange-50 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400'
+    };
+    
+    return badges[type] || badges.daily;
   };
 
   return (
@@ -245,6 +364,7 @@ export default function ChallengesTab() {
               </div>
               <ChallengeEditor
                 initial={{
+                  challengeType: 'daily',
                   question: '',
                   options: ['', ''],
                   correctOptionIndex: 0,
@@ -258,20 +378,37 @@ export default function ChallengesTab() {
               />
             </>
           ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Challenges</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Create a pool of questions, then assign one to each date.
-                </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Challenges</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Create daily, weekly, and special challenges with different scheduling options.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
+                >
+                  <Plus className="w-4 h-4" /> New challenge
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
-              >
-                <Plus className="w-4 h-4" /> New challenge
-              </button>
+              
+              {/* Challenge Type Filter */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-500" />
+                <select
+                  value={challengeTypeFilter}
+                  onChange={(e) => setChallengeTypeFilter(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                >
+                  <option value="">All Types</option>
+                  <option value="daily">Daily Challenges</option>
+                  <option value="weekly">Weekly Challenges</option>
+                  <option value="special">Special Challenges</option>
+                </select>
+              </div>
             </div>
           )}
         </CardContent>
@@ -301,6 +438,11 @@ export default function ChallengesTab() {
                   ) : (
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${getChallengeTypeBadge(row.challengeType)}`}>
+                            {row.challengeType?.toUpperCase() || 'DAILY'}
+                          </span>
+                        </div>
                         <div className="text-sm font-medium text-slate-900 dark:text-white">
                           {row.question}
                         </div>
@@ -332,9 +474,9 @@ export default function ChallengesTab() {
                           </span>
                           <span>•</span>
                           <span>
-                            Assigned:{' '}
+                            Schedule:{' '}
                             <span className="text-slate-900 dark:text-white">
-                              {row.challengeDate ? formatShortDate(row.challengeDate) : 'unassigned'}
+                              {getChallengeTypeDisplay(row)}
                             </span>
                           </span>
                           <span>•</span>
@@ -362,7 +504,8 @@ export default function ChallengesTab() {
                           onClick={() => handleAssign(row)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 text-xs"
                         >
-                          <Calendar className="w-3 h-3" /> Assign
+                          <Calendar className="w-3 h-3" /> 
+                          {row.challengeType === 'daily' ? 'Assign' : 'Info'}
                         </button>
                       </div>
                     </div>
