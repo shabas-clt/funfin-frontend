@@ -22,6 +22,14 @@ import MentorSignals from '../pages/mentor/signals/MentorSignals';
 import SignIn from '../pages/auth/SignIn';
 import PageTransition from '../components/shared/PageTransition';
 
+// New admin panel features
+import MemesList from '../pages/admin/memes/MemesList';
+import PostingCategories from '../pages/admin/memes/PostingCategories';
+import ContentCategories from '../pages/admin/memes/ContentCategories';
+import ReferralConfig from '../pages/admin/referrals/ReferralConfig';
+import ReferralAnalytics from '../pages/admin/referrals/ReferralAnalytics';
+import LeaderboardsPreview from '../pages/admin/leaderboards/LeaderboardsPreview';
+
 const AppRoutes = () => {
   const location = useLocation();
 
@@ -50,6 +58,14 @@ const AppRoutes = () => {
             <Route path="live-chart" element={<PageTransition><LiveChart /></PageTransition>} />
             <Route path="live-engine/dashboard" element={<PageTransition><LiveEngineDashboard /></PageTransition>} />
             <Route path="live-engine/tokens" element={<PageTransition><TokenManagement /></PageTransition>} />
+            
+            {/* New admin panel features */}
+            <Route path="memes" element={<PageTransition><MemesList /></PageTransition>} />
+            <Route path="memes/posting-categories" element={<PageTransition><PostingCategories /></PageTransition>} />
+            <Route path="memes/content-categories" element={<PageTransition><ContentCategories /></PageTransition>} />
+            <Route path="referrals/config" element={<PageTransition><ReferralConfig /></PageTransition>} />
+            <Route path="referrals/analytics" element={<PageTransition><ReferralAnalytics /></PageTransition>} />
+            <Route path="leaderboards" element={<PageTransition><LeaderboardsPreview /></PageTransition>} />
           </Route>
         </Route>
 
