@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
-import { CandlestickSeries, ColorType, HistogramSeries, createChart } from 'lightweight-charts';
+import { CandlestickSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 
 const ASSETS = [
@@ -15,12 +15,6 @@ const VIEW_OPTIONS = [
   { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
 ];
 const AUTH_COOKIE_KEY = 'ff_admin_token';
-const INTERVAL_SECONDS = {
-  '1s': 1,
-  '1m': 60,
-  '5m': 300,
-  '15m': 900,
-};
 const DEFAULT_VISIBLE_BARS = {
   '1s': 90,
   '1m': 80,
@@ -163,42 +157,6 @@ function appendTickToOneSecondCandles(prev, tickPrice, tickMs) {
   return next.slice(-600);
 }
 
-function fillMissingCandles(rows, stepSeconds) {
-  if (!rows.length || !Number.isFinite(stepSeconds) || stepSeconds <= 0) return rows;
-
-  // Only fill small gaps. Some feeds can have large time jumps (illiquid ticks),
-  // and filling every missing second would create huge arrays and make 1s view look empty/frozen.
-  const maxFillBars = stepSeconds === 1 ? 5 : 2;
-
-  const filled = [rows[0]];
-  for (let i = 1; i < rows.length; i += 1) {
-    const prev = filled[filled.length - 1];
-    const current = rows[i];
-    const gapBars = Math.floor((current.time - prev.time) / stepSeconds) - 1;
-    if (gapBars > maxFillBars) {
-      filled.push(current);
-      continue;
-    }
-    let cursor = prev.time + stepSeconds;
-
-    while (cursor < current.time) {
-      filled.push({
-        time: cursor,
-        open: prev.close,
-        high: prev.close,
-        low: prev.close,
-        close: prev.close,
-        volume: 0,
-      });
-      cursor += stepSeconds;
-    }
-
-    filled.push(current);
-  }
-
-  return filled;
-}
-
 function formatLocalFromChartTime(time, showSeconds = true) {
   if (typeof time !== 'number') return '';
   return new Date(time * 1000).toLocaleTimeString('en-IN', {
@@ -220,7 +178,6 @@ const LiveChart = () => {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
-  const volumeSeriesRef = useRef(null);
   const shouldAutoFitRef = useRef(true);
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
@@ -344,13 +301,24 @@ const LiveChart = () => {
         ) {
           return;
         }
+        const incomingSec = asUnixSeconds(candle.timestamp);
+        if (incomingSec === null) return;
         setCandles((prev) => {
           const next = [...prev];
-          const idx = next.findIndex((c) => c.timestamp === candle.timestamp);
+          // Match on bucketed unix seconds so timestamps like "...Z" and "..." merge correctly.
+          const idx = next.findIndex((c) => asUnixSeconds(c.timestamp) === incomingSec);
+          const merged = {
+            timestamp: candle.timestamp,
+            open: Number(candle.open),
+            high: Number(candle.high),
+            low: Number(candle.low),
+            close: Number(candle.close),
+            volume: isFiniteNumber(candle.volume) ? Number(candle.volume) : 0,
+          };
           if (idx >= 0) {
-            next[idx] = candle;
+            next[idx] = merged;
           } else {
-            next.push(candle);
+            next.push(merged);
           }
           return next.slice(-600);
         });
@@ -421,6 +389,7 @@ const LiveChart = () => {
         rightPriceScale: {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
           autoScale: true,
+          scaleMargins: { top: 0.08, bottom: 0.08 },
         },
         timeScale: {
           borderColor: isDark ? '#3f3f46' : '#cbd5e1',
@@ -429,8 +398,8 @@ const LiveChart = () => {
           tickMarkFormatter: (time) =>
             formatLocalFromChartTime(time, selectedView.secondsVisible),
           rightOffset: 2,
-          barSpacing: selectedView.id === '1s' ? 24 : 26,
-          minBarSpacing: selectedView.id === '1s' ? 18 : 20,
+          barSpacing: selectedView.id === '1s' ? 16 : 18,
+          minBarSpacing: selectedView.id === '1s' ? 10 : 12,
         },
       });
 
@@ -438,36 +407,26 @@ const LiveChart = () => {
         upColor: '#22c55e',
         downColor: '#ef4444',
         borderVisible: true,
-        borderColor: isDark ? '#52525b' : '#94a3b8',
+        borderUpColor: '#16a34a',
+        borderDownColor: '#dc2626',
         wickUpColor: '#22c55e',
         wickDownColor: '#ef4444',
         priceLineVisible: true,
       };
-      const volumeOptions = {
-        color: '#64748b',
-        priceFormat: { type: 'volume' },
-        priceScaleId: '',
-      };
 
-      // Support lightweight-charts v5 (addSeries) and older APIs (addCandlestickSeries/addHistogramSeries).
       const candleSeries =
         typeof chart.addCandlestickSeries === 'function'
           ? chart.addCandlestickSeries(candleOptions)
           : chart.addSeries(CandlestickSeries, candleOptions);
-      const volumeSeries =
-        typeof chart.addHistogramSeries === 'function'
-          ? chart.addHistogramSeries(volumeOptions)
-          : chart.addSeries(HistogramSeries, volumeOptions);
 
-      volumeSeries.priceScale().applyOptions({
-        scaleMargins: { top: 0.82, bottom: 0 },
+      candleSeries.priceScale().applyOptions({
+        autoScale: true,
+        scaleMargins: { top: 0.08, bottom: 0.08 },
       });
 
       chartRef.current = chart;
       candleSeriesRef.current = candleSeries;
-      volumeSeriesRef.current = volumeSeries;
     } catch (chartError) {
-      // Keep UI stable even if chart library init fails.
       console.error('Failed to initialize trading chart', chartError);
     }
 
@@ -477,12 +436,11 @@ const LiveChart = () => {
       }
       chartRef.current = null;
       candleSeriesRef.current = null;
-      volumeSeriesRef.current = null;
     };
   }, [isDark, selectedView.id, selectedView.secondsVisible]);
 
   useEffect(() => {
-    if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
+    if (!candleSeriesRef.current) return;
 
     const mapped = candles
       .map((c) => {
@@ -496,14 +454,13 @@ const LiveChart = () => {
         ) {
           return null;
         }
-        
+
         return {
           time,
           open: Number(c.open),
           high: Number(c.high),
           low: Number(c.low),
           close: Number(c.close),
-          volume: isFiniteNumber(c.volume) ? Number(c.volume) : 0,
         };
       })
       .filter(Boolean)
@@ -518,41 +475,20 @@ const LiveChart = () => {
       }
     }
 
-    const normalized = fillMissingCandles(deduped, INTERVAL_SECONDS[selectedView.id] ?? 1);
-
     try {
-      candleSeriesRef.current.setData(
-        normalized.map((c) => ({
-          time: c.time,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-        }))
-      );
-      volumeSeriesRef.current.setData(
-        normalized.map((c) => ({
-          time: c.time,
-          value: c.volume,
-          color:
-            c.close > c.open
-              ? 'rgba(34,197,94,0.45)'
-              : c.close < c.open
-                ? 'rgba(239,68,68,0.45)'
-                : 'rgba(100,116,139,0.45)',
-        }))
-      );
+      candleSeriesRef.current.setData(deduped);
     } catch (updateError) {
       console.error('Chart setData failed', updateError);
       return;
     }
 
-    if (normalized.length && chartRef.current && shouldAutoFitRef.current) {
+    if (deduped.length && chartRef.current && shouldAutoFitRef.current) {
       const visibleBars = DEFAULT_VISIBLE_BARS[selectedView.id] ?? 60;
-      const from = Math.max(0, normalized.length - visibleBars);
-      const to = normalized.length + 1;
+      const from = Math.max(0, deduped.length - visibleBars);
+      const to = deduped.length + 1;
       chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
       chartRef.current.timeScale().scrollToRealTime();
+      candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
       shouldAutoFitRef.current = false;
     }
   }, [candles, selectedView.id]);
