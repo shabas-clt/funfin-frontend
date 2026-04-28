@@ -166,10 +166,19 @@ function appendTickToOneSecondCandles(prev, tickPrice, tickMs) {
 function fillMissingCandles(rows, stepSeconds) {
   if (!rows.length || !Number.isFinite(stepSeconds) || stepSeconds <= 0) return rows;
 
+  // Only fill small gaps. Some feeds can have large time jumps (illiquid ticks),
+  // and filling every missing second would create huge arrays and make 1s view look empty/frozen.
+  const maxFillBars = stepSeconds === 1 ? 5 : 2;
+
   const filled = [rows[0]];
   for (let i = 1; i < rows.length; i += 1) {
     const prev = filled[filled.length - 1];
     const current = rows[i];
+    const gapBars = Math.floor((current.time - prev.time) / stepSeconds) - 1;
+    if (gapBars > maxFillBars) {
+      filled.push(current);
+      continue;
+    }
     let cursor = prev.time + stepSeconds;
 
     while (cursor < current.time) {
@@ -420,8 +429,8 @@ const LiveChart = () => {
           tickMarkFormatter: (time) =>
             formatLocalFromChartTime(time, selectedView.secondsVisible),
           rightOffset: 2,
-          barSpacing: selectedView.id === '1s' ? 12 : 14,
-          minBarSpacing: selectedView.id === '1s' ? 8 : 10,
+          barSpacing: selectedView.id === '1s' ? 18 : 20,
+          minBarSpacing: selectedView.id === '1s' ? 12 : 14,
         },
       });
 
