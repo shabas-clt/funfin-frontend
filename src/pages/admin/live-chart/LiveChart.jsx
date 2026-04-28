@@ -15,6 +15,18 @@ const VIEW_OPTIONS = [
   { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
 ];
 const AUTH_COOKIE_KEY = 'ff_admin_token';
+const INTERVAL_SECONDS = {
+  '1s': 1,
+  '1m': 60,
+  '5m': 300,
+  '15m': 900,
+};
+const DEFAULT_VISIBLE_BARS = {
+  '1s': 90,
+  '1m': 80,
+  '5m': 60,
+  '15m': 50,
+};
 
 function getClientApiBaseUrl() {
   const configured = import.meta.env.VITE_CLIENT_API_URL;
@@ -151,6 +163,33 @@ function appendTickToOneSecondCandles(prev, tickPrice, tickMs) {
   return next.slice(-600);
 }
 
+function fillMissingCandles(rows, stepSeconds) {
+  if (!rows.length || !Number.isFinite(stepSeconds) || stepSeconds <= 0) return rows;
+
+  const filled = [rows[0]];
+  for (let i = 1; i < rows.length; i += 1) {
+    const prev = filled[filled.length - 1];
+    const current = rows[i];
+    let cursor = prev.time + stepSeconds;
+
+    while (cursor < current.time) {
+      filled.push({
+        time: cursor,
+        open: prev.close,
+        high: prev.close,
+        low: prev.close,
+        close: prev.close,
+        volume: 0,
+      });
+      cursor += stepSeconds;
+    }
+
+    filled.push(current);
+  }
+
+  return filled;
+}
+
 function formatLocalFromChartTime(time, showSeconds = true) {
   if (typeof time !== 'number') return '';
   return new Date(time * 1000).toLocaleTimeString('en-IN', {
@@ -197,16 +236,11 @@ const LiveChart = () => {
     }
     
     try {
-      // Fetch historical candles from live-engine API for ALL intervals including 1s
-      console.log('Fetching candles from:', `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`);
-      
       const response = await fetch(
         `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`
       );
       const payload = await response.json();
-      
-      console.log('Candles response:', { ok: response.ok, status: response.status, dataLength: Array.isArray(payload) ? payload.length : 0 });
-      
+
       if (!response.ok) {
         throw new Error(payload?.detail || 'Failed to load candles');
       }
@@ -222,10 +256,8 @@ const LiveChart = () => {
           close: c.close,
           volume: c.volume || 0,
         }));
-        console.log('✅ Loaded', mappedCandles.length, 'historical candles for', asset, selectedView.apiTimeframe);
         setCandles(mappedCandles);
       } else {
-        console.warn('⚠️ Payload is not an array:', payload);
         setCandles([]);
       }
     } catch (err) {
@@ -387,9 +419,9 @@ const LiveChart = () => {
           secondsVisible: selectedView.secondsVisible,
           tickMarkFormatter: (time) =>
             formatLocalFromChartTime(time, selectedView.secondsVisible),
-          rightOffset: 6,
-          barSpacing: selectedView.id === '1s' ? 7 : 10,
-          minBarSpacing: selectedView.id === '1s' ? 3 : 5,
+          rightOffset: 2,
+          barSpacing: selectedView.id === '1s' ? 12 : 14,
+          minBarSpacing: selectedView.id === '1s' ? 8 : 10,
         },
       });
 
@@ -477,9 +509,11 @@ const LiveChart = () => {
       }
     }
 
+    const normalized = fillMissingCandles(deduped, INTERVAL_SECONDS[selectedView.id] ?? 1);
+
     try {
       candleSeriesRef.current.setData(
-        deduped.map((c) => ({
+        normalized.map((c) => ({
           time: c.time,
           open: c.open,
           high: c.high,
@@ -488,7 +522,7 @@ const LiveChart = () => {
         }))
       );
       volumeSeriesRef.current.setData(
-        deduped.map((c) => ({
+        normalized.map((c) => ({
           time: c.time,
           value: c.volume,
           color:
@@ -504,12 +538,15 @@ const LiveChart = () => {
       return;
     }
 
-    if (deduped.length && chartRef.current && shouldAutoFitRef.current) {
-      chartRef.current.timeScale().fitContent();
+    if (normalized.length && chartRef.current && shouldAutoFitRef.current) {
+      const visibleBars = DEFAULT_VISIBLE_BARS[selectedView.id] ?? 60;
+      const from = Math.max(0, normalized.length - visibleBars);
+      const to = normalized.length + 1;
+      chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
       chartRef.current.timeScale().scrollToRealTime();
       shouldAutoFitRef.current = false;
     }
-  }, [candles]);
+  }, [candles, selectedView.id]);
 
   return (
     <div className="p-4 sm:p-6">
