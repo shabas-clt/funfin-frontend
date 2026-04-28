@@ -34,8 +34,8 @@ function getLiveEngineUrl() {
   const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
   if (configured) return configured.replace(/\/$/, '');
   
-  // Default to localhost for development
-  return 'http://localhost:8001';
+  // // Default to localhost for development
+  // return 'http://localhost:8001';
 }
 
 function toWsUrl(apiBase, token) {
