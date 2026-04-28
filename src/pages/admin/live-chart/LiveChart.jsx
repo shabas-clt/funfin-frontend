@@ -32,10 +32,11 @@ function getClientApiBaseUrl() {
 
 function getLiveEngineUrl() {
   const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
-  if (configured) return configured.replace(/\/$/, '');
-  
-  // // Default to localhost for development
-  // return 'http://localhost:8001';
+  if (!configured) {
+    console.error('VITE_LIVE_ENGINE_URL is not configured!');
+    return null;
+  }
+  return configured.replace(/\/$/, '');
 }
 
 function toWsUrl(apiBase, token) {
@@ -188,17 +189,24 @@ const LiveChart = () => {
 
   const loadCandles = useCallback(async () => {
     setError('');
-    if (selectedView.id === '1s') {
-      // 1s view is built locally from live ticks; skip REST history.
-      setCandles([]);
+    
+    // Check if live engine URL is configured
+    if (!liveEngineUrl) {
+      setError('Live Engine URL is not configured. Please set VITE_LIVE_ENGINE_URL environment variable.');
       return;
     }
+    
     try {
-      // Fetch historical candles from live-engine API
+      // Fetch historical candles from live-engine API for ALL intervals including 1s
+      console.log('Fetching candles from:', `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`);
+      
       const response = await fetch(
         `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`
       );
       const payload = await response.json();
+      
+      console.log('Candles response:', { ok: response.ok, status: response.status, dataLength: Array.isArray(payload) ? payload.length : 0 });
+      
       if (!response.ok) {
         throw new Error(payload?.detail || 'Failed to load candles');
       }
@@ -214,11 +222,14 @@ const LiveChart = () => {
           close: c.close,
           volume: c.volume || 0,
         }));
+        console.log('✅ Loaded', mappedCandles.length, 'historical candles for', asset, selectedView.apiTimeframe);
         setCandles(mappedCandles);
       } else {
+        console.warn('⚠️ Payload is not an array:', payload);
         setCandles([]);
       }
     } catch (err) {
+      console.error('❌ Error loading candles:', err);
       setError(err?.message || 'Unable to fetch candle history');
     }
   }, [liveEngineUrl, asset, selectedView]);
@@ -259,12 +270,7 @@ const LiveChart = () => {
         if (message.type === 'subscribed') {
           if (typeof message.price === 'number') {
             setLatestPrice(message.price);
-            if (selectedView.id === '1s') {
-              // Seed initial context so 1s view doesn't look empty/blocky on open.
-              setCandles((prev) =>
-                prev.length ? prev : buildSeedOneSecondCandles(message.price, Date.now(), 120)
-              );
-            }
+            // Don't seed for 1s - we now load historical data from API
           }
           return;
         }
