@@ -429,8 +429,8 @@ const LiveChart = () => {
           tickMarkFormatter: (time) =>
             formatLocalFromChartTime(time, selectedView.secondsVisible),
           rightOffset: 2,
-          barSpacing: selectedView.id === '1s' ? 18 : 20,
-          minBarSpacing: selectedView.id === '1s' ? 12 : 14,
+          barSpacing: selectedView.id === '1s' ? 24 : 26,
+          minBarSpacing: selectedView.id === '1s' ? 18 : 20,
         },
       });
 
