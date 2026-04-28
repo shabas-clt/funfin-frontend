@@ -5,13 +5,13 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { formatShortDate } from '@/lib/format';
-import ChallengeTypeSelector from '../../../components/admin/gamification/ChallengeTypeSelector';
-import ConditionalChallengeFields from '../../../components/admin/gamification/ConditionalChallengeFields';
+import ChallengeTypeSelector from '../../../../components/admin/gamification/ChallengeTypeSelector';
+import ConditionalChallengeFields from '../../../../components/admin/gamification/ConditionalChallengeFields';
 import { 
   weeklyChallengeSchema, 
   specialChallengeSchema, 
   dailyChallengeSchema 
-} from '../../../lib/validators/challengeValidators';
+} from '../../../../lib/validators/challengeValidators';
 
 const PAGE_SIZE = 20;
 
