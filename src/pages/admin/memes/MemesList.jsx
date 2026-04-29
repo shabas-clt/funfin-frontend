@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, MessageSquare, Tag, FolderOpen } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
@@ -10,6 +11,8 @@ import MemeDetailsModal from '../../../components/admin/memes/MemeDetailsModal';
 import DeleteMemeDialog from '../../../components/admin/memes/DeleteMemeDialog';
 
 export default function MemesList() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [memes, setMemes] = useState([]);
@@ -89,8 +92,40 @@ export default function MemesList() {
 
   const totalPages = Math.ceil(total / limit);
 
+  const tabs = [
+    { name: 'All Memes', path: '/admin/memes', icon: MessageSquare },
+    { name: 'Posting Categories', path: '/admin/memes/posting-categories', icon: Tag },
+    { name: 'Content Categories', path: '/admin/memes/content-categories', icon: FolderOpen },
+  ];
+
+  const currentTab = tabs.find(tab => tab.path === location.pathname) || tabs[0];
+
   return (
     <div className="space-y-5">
+      {/* Navigation Tabs */}
+      <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-1">
+        <div className="flex gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = location.pathname === tab.path;
+            return (
+              <button
+                key={tab.path}
+                onClick={() => navigate(tab.path)}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-neutral-900'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Memes Management</h1>

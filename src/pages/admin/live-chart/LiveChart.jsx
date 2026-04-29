@@ -16,10 +16,10 @@ const VIEW_OPTIONS = [
 ];
 const AUTH_COOKIE_KEY = 'ff_admin_token';
 const DEFAULT_VISIBLE_BARS = {
-  '1s': 90,
+  '1s': 80,
   '1m': 80,
-  '5m': 60,
-  '15m': 50,
+  '5m': 80,
+  '15m': 80,
 };
 
 function getClientApiBaseUrl() {
