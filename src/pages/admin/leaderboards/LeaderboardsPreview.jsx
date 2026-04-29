@@ -17,6 +17,7 @@ export default function LeaderboardsPreview() {
     if (!isRefresh) setLoading(true);
 
     try {
+      // Note: These endpoints are on the client API but now accept both user and admin tokens
       const [coinsData, winRateData] = await Promise.all([
         clientApi.get('/leaderboard/all-time/coins', { params: { limit: 20 } }),
         clientApi.get('/leaderboard/all-time/win-rate', { params: { limit: 20, minPredictions: 10 } })
