@@ -23,8 +23,8 @@ export default function LeaderboardsPreview() {
         clientApi.get('/leaderboard/all-time/win-rate', { params: { limit: 20, minPredictions: 10 } })
       ]);
       
-      setCoinsLeaderboard(coinsData);
-      setWinRateLeaderboard(winRateData);
+      setCoinsLeaderboard({ ...coinsData, type: 'coins' });
+      setWinRateLeaderboard({ ...winRateData, type: 'win-rate' });
     } catch (error) {
       const message = typeof error === 'string' ? error : 'Failed to load leaderboards';
       toast.error(message);

@@ -35,7 +35,7 @@ const AppRoutes = () => {
 
   return (
     <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
+      <Routes location={location}>
         {/* Public auth routes */}
         <Route path="/auth/login" element={<SignIn />} />
 
