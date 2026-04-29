@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { RefreshCw } from 'lucide-react';
-import { getMemes, deleteMeme } from '../../../api/meme';
+import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import MemesTable from '../../../components/admin/memes/MemesTable';
 import MemeFilters from '../../../components/admin/memes/MemeFilters';
@@ -9,7 +10,7 @@ import MemeDetailsModal from '../../../components/admin/memes/MemeDetailsModal';
 import DeleteMemeDialog from '../../../components/admin/memes/DeleteMemeDialog';
 
 export default function MemesList() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [memes, setMemes] = useState([]);
   const [total, setTotal] = useState(0);
@@ -28,7 +29,7 @@ export default function MemesList() {
   const limit = 20;
 
   const loadMemes = async (isRefresh = false) => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     if (!isRefresh) setLoading(true);
 
     try {
@@ -41,11 +42,11 @@ export default function MemesList() {
         sortBy: filters.sortBy
       };
 
-      const data = await getMemes(token, params);
+      const data = await api.get('/admin/memes', { params });
       setMemes(data.memes || []);
       setTotal(data.total || 0);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to load memes';
+      const message = typeof error === 'string' ? error : 'Failed to load memes';
       toast.error(message);
       console.error('Memes fetch error:', error);
     } finally {
@@ -55,7 +56,7 @@ export default function MemesList() {
 
   useEffect(() => {
     loadMemes();
-  }, [token, page, filters]);
+  }, [isAuthenticated, page, filters]);
 
   const handleRefresh = () => {
     loadMemes(true);
@@ -72,16 +73,16 @@ export default function MemesList() {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!memeToDelete || !token) return;
+    if (!memeToDelete) return;
 
     try {
-      await deleteMeme(memeToDelete.id, token);
+      await api.delete(`/admin/memes/${memeToDelete.id}`);
       toast.success('Meme deleted successfully');
       setShowDeleteDialog(false);
       setMemeToDelete(null);
       loadMemes(true);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to delete meme';
+      const message = typeof error === 'string' ? error : 'Failed to delete meme';
       toast.error(message);
     }
   };
@@ -108,8 +109,19 @@ export default function MemesList() {
       <MemeFilters filters={filters} setFilters={setFilters} setPage={setPage} />
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+                <Skeleton className="w-20 h-8" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : memes.length === 0 ? (
         <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-12 text-center">

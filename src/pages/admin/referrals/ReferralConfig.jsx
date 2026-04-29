@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Save } from 'lucide-react';
-import { getReferralConfig, updateReferralConfig } from '../../../api/referral';
+import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import ConfigForm from '../../../components/admin/referrals/ConfigForm';
 
 export default function ReferralConfig() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState(null);
 
   const loadConfig = async () => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     setLoading(true);
 
     try {
-      const data = await getReferralConfig(token);
+      const data = await api.get('/admin/referral/config');
       setConfig(data);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to load config';
+      const message = typeof error === 'string' ? error : 'Failed to load config';
       toast.error(message);
       console.error('Config fetch error:', error);
     } finally {
@@ -28,17 +28,15 @@ export default function ReferralConfig() {
 
   useEffect(() => {
     loadConfig();
-  }, [token]);
+  }, [isAuthenticated]);
 
   const handleSave = async (formData) => {
-    if (!token) return;
-
     try {
-      const updated = await updateReferralConfig(formData, token);
+      const updated = await api.put('/admin/referral/config', formData);
       setConfig(updated);
       toast.success('Configuration updated successfully');
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to update config';
+      const message = typeof error === 'string' ? error : 'Failed to update config';
       toast.error(message);
       throw error;
     }
@@ -54,8 +52,28 @@ export default function ReferralConfig() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="max-w-2xl space-y-5">
+          <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
+            <Skeleton className="h-6 w-48 mb-4" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-6 w-20" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-6 w-32" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
+            <Skeleton className="h-6 w-48 mb-4" />
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          </div>
         </div>
       ) : config ? (
         <ConfigForm config={config} onSave={handleSave} />
