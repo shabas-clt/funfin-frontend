@@ -7,12 +7,14 @@ const AdminLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const mainRef = useRef(null);
   const location = useLocation();
+  const prevLocationRef = useRef(location.pathname);
 
-  // Scroll to top when route changes
+  // Scroll main content to top when route changes (but not on initial mount)
   useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTo(0, 0);
+    if (mainRef.current && prevLocationRef.current !== location.pathname) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
+    prevLocationRef.current = location.pathname;
   }, [location.pathname]);
 
   return (
