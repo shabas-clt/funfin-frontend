@@ -45,21 +45,23 @@ export default function ReferralConfig() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Referral System Configuration</h1>
-        <p className="text-gray-600 mt-1">Manage referral system settings and rewards</p>
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Referral System Configuration</h1>
+          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Manage referral system settings and rewards</p>
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
       ) : config ? (
         <ConfigForm config={config} onSave={handleSave} />
       ) : (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500">Failed to load configuration</p>
+        <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-12 text-center">
+          <p className="text-slate-400 dark:text-slate-500">Failed to load configuration</p>
         </div>
       )}
     </div>

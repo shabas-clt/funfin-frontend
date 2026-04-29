@@ -62,24 +62,24 @@ export default function ContentCategories() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Content Categories</h1>
-          <p className="text-gray-600 mt-1">Manage meme content categories (crypto/stock/trading)</p>
+          <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Content Categories</h1>
+          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Manage meme content categories (crypto/stock/trading)</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => loadCategories(true)}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-neutral-800 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-300 dark:hover:bg-neutral-700 disabled:opacity-50 transition-colors text-sm font-medium"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
           <button
             onClick={() => setShowAddDialog(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Add Category
@@ -89,7 +89,7 @@ export default function ContentCategories() {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
         <CategoriesTable

@@ -1,4 +1,5 @@
 import { Users, CheckCircle, Clock, Coins, TrendingUp } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function StatsCards({ analytics }) {
   const stats = [
@@ -6,60 +7,57 @@ export default function StatsCards({ analytics }) {
       title: 'Total Referrals',
       value: analytics.totalReferrals || 0,
       icon: Users,
-      color: 'bg-blue-500',
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-600'
+      bg: 'bg-indigo-100 dark:bg-indigo-900/40',
+      color: 'text-indigo-500'
     },
     {
       title: 'Successful Referrals',
       value: analytics.successfulReferrals || 0,
       icon: CheckCircle,
-      color: 'bg-green-500',
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-600'
+      bg: 'bg-emerald-100 dark:bg-emerald-900/40',
+      color: 'text-emerald-500'
     },
     {
       title: 'Pending Referrals',
       value: analytics.pendingReferrals || 0,
       icon: Clock,
-      color: 'bg-yellow-500',
-      bgColor: 'bg-yellow-50',
-      textColor: 'text-yellow-600'
+      bg: 'bg-amber-100 dark:bg-amber-900/40',
+      color: 'text-amber-500'
     },
     {
       title: 'Total Coins Awarded',
       value: analytics.totalCoinsAwarded || 0,
       icon: Coins,
-      color: 'bg-purple-500',
-      bgColor: 'bg-purple-50',
-      textColor: 'text-purple-600'
+      bg: 'bg-violet-100 dark:bg-violet-900/40',
+      color: 'text-violet-500'
     },
     {
       title: 'Avg Referrals per User',
       value: (analytics.averageReferralsPerUser || 0).toFixed(2),
       icon: TrendingUp,
-      color: 'bg-indigo-500',
-      bgColor: 'bg-indigo-50',
-      textColor: 'text-indigo-600'
+      bg: 'bg-cyan-100 dark:bg-cyan-900/40',
+      color: 'text-cyan-500'
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
-          <div key={index} className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className={`flex-shrink-0 ${stat.bgColor} rounded-md p-3`}>
-                <Icon className={`w-6 h-6 ${stat.textColor}`} />
+          <Card key={index} className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
+            <CardContent className="p-5">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.title}</span>
+              <div className="flex items-center gap-4 mt-3">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stat.bg}`}>
+                  <Icon className={`w-6 h-6 ${stat.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-[22px] font-bold text-slate-900 dark:text-white leading-tight truncate">{stat.value}</h3>
+                </div>
               </div>
-              <div className="ml-4 flex-1">
-                <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

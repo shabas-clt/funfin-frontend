@@ -2,79 +2,82 @@ import { Trash2 } from 'lucide-react';
 
 export default function CategoriesTable({ categories, onDelete }) {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Code
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Name
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Sort Order
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Created
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {categories.length === 0 ? (
-            <tr>
-              <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                No categories found
-              </td>
+    <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="overflow-x-auto px-2">
+        <table className="w-full text-[13px] text-left whitespace-nowrap">
+          <thead>
+            <tr className="border-b border-slate-100 dark:border-neutral-800">
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Code
+              </th>
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Name
+              </th>
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Status
+              </th>
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Sort Order
+              </th>
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Created
+              </th>
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">
+                Actions
+              </th>
             </tr>
-          ) : (
-            categories.map((category) => (
-              <tr key={category.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                    {category.code}
-                  </code>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {category.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      category.isActive
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {category.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {category.sortOrder}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(category.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => onDelete(category.id)}
-                    className="text-red-600 hover:text-red-900"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+          </thead>
+          <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
+            {categories.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="px-5 py-12 text-center text-slate-400 dark:text-slate-500">
+                  No categories found
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              categories.map((category) => (
+                <tr key={category.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-900/70 transition-colors">
+                  <td className="px-5 py-3.5">
+                    <code className="text-sm font-mono bg-slate-100 dark:bg-neutral-900 px-2 py-1 rounded text-slate-900 dark:text-slate-100">
+                      {category.code}
+                    </code>
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-900 dark:text-white">
+                    {category.name}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span
+                      className={`inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full ${
+                        category.isActive
+                          ? 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+                          : 'bg-slate-100 text-slate-600 dark:bg-neutral-800 dark:text-slate-400'
+                      }`}
+                    >
+                      {category.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
+                    {category.sortOrder}
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
+                    {new Date(category.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <button
+                      onClick={() => onDelete(category.id)}
+                      className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center inline-flex"
+                      title="Delete"
+                      aria-label="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

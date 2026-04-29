@@ -41,16 +41,16 @@ export default function LeaderboardsPreview() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Leaderboards Preview</h1>
-          <p className="text-gray-600 mt-1">View all-time leaderboards for coins and win rates</p>
+          <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Leaderboards Preview</h1>
+          <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">View all-time leaderboards for coins and win rates</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors text-sm font-medium"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -59,7 +59,7 @@ export default function LeaderboardsPreview() {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -74,9 +74,9 @@ export default function LeaderboardsPreview() {
         </div>
       )}
 
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-blue-800 mb-2">Calculation Methods</h3>
-        <div className="text-sm text-blue-700 space-y-1">
+      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
+        <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 mb-2">Calculation Methods</h3>
+        <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
           <p><strong>Coins Leaderboard:</strong> Total coins earned across all activities</p>
           <p><strong>Win Rate Leaderboard:</strong> (Wins ÷ Total Predictions) × 100 (minimum 10 predictions required)</p>
         </div>
