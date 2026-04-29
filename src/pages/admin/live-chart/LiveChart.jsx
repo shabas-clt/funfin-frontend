@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
-import { CandlestickSeries, ColorType, createChart } from 'lightweight-charts';
+import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 
 const ASSETS = [
@@ -403,29 +403,43 @@ const LiveChart = () => {
         },
       });
 
-      const candleOptions = {
-        upColor: '#22c55e',
-        downColor: '#ef4444',
-        borderVisible: true,
-        borderUpColor: '#16a34a',
-        borderDownColor: '#dc2626',
-        wickUpColor: '#22c55e',
-        wickDownColor: '#ef4444',
-        priceLineVisible: true,
-      };
+      let mainSeries;
+      
+      if (selectedView.id === '1s') {
+        const areaOptions = {
+          lineColor: '#22c55e',
+          topColor: 'rgba(34, 197, 94, 0.4)',
+          bottomColor: 'rgba(34, 197, 94, 0.0)',
+          lineWidth: 2,
+          priceLineVisible: true,
+        };
+        mainSeries = typeof chart.addAreaSeries === 'function'
+          ? chart.addAreaSeries(areaOptions)
+          : chart.addSeries(AreaSeries, areaOptions);
+      } else {
+        const candleOptions = {
+          upColor: '#22c55e',
+          downColor: '#ef4444',
+          borderVisible: true,
+          borderUpColor: '#16a34a',
+          borderDownColor: '#dc2626',
+          wickUpColor: '#22c55e',
+          wickDownColor: '#ef4444',
+          priceLineVisible: true,
+        };
 
-      const candleSeries =
-        typeof chart.addCandlestickSeries === 'function'
+        mainSeries = typeof chart.addCandlestickSeries === 'function'
           ? chart.addCandlestickSeries(candleOptions)
           : chart.addSeries(CandlestickSeries, candleOptions);
+      }
 
-      candleSeries.priceScale().applyOptions({
+      mainSeries.priceScale().applyOptions({
         autoScale: true,
         scaleMargins: { top: 0.08, bottom: 0.08 },
       });
 
       chartRef.current = chart;
-      candleSeriesRef.current = candleSeries;
+      candleSeriesRef.current = mainSeries;
     } catch (chartError) {
       console.error('Failed to initialize trading chart', chartError);
     }
@@ -453,6 +467,13 @@ const LiveChart = () => {
           !isFiniteNumber(c.close)
         ) {
           return null;
+        }
+
+        if (selectedView.id === '1s') {
+          return {
+            time,
+            value: Number(c.close),
+          };
         }
 
         return {
