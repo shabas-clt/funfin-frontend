@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Play, FileVideo, AlertCircle } from 'lucide-react';
+import { Upload, X, FileVideo, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 export default function VideoUpload({ 
@@ -125,7 +125,7 @@ export default function VideoUpload({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           Introduction Video
         </label>
         {value && (
@@ -133,7 +133,7 @@ export default function VideoUpload({
             type="button"
             onClick={handleRemove}
             disabled={disabled || uploading}
-            className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
+            className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 text-sm disabled:opacity-50 transition-colors"
           >
             <X className="w-4 h-4 inline mr-1" />
             Remove
@@ -143,21 +143,21 @@ export default function VideoUpload({
 
       {value ? (
         // Video Preview
-        <div className="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-200">
+        <div className="bg-slate-50 dark:bg-neutral-900 rounded-lg p-4 border-2 border-dashed border-slate-200 dark:border-neutral-700">
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0">
-              <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center">
-                <FileVideo className="w-8 h-8 text-blue-600" />
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg flex items-center justify-center">
+                <FileVideo className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">Introduction Video</p>
-              <p className="text-sm text-gray-500">Video uploaded successfully</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Introduction Video</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Video uploaded successfully</p>
               <div className="mt-2">
                 <video
                   src={value}
                   controls
-                  className="w-full max-w-md h-32 rounded border"
+                  className="w-full max-w-md h-32 rounded border border-slate-200 dark:border-neutral-700"
                   preload="metadata"
                 >
                   Your browser does not support the video tag.
@@ -174,8 +174,8 @@ export default function VideoUpload({
           onDragEnter={(e) => e.preventDefault()}
           className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
             disabled || uploading
-              ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
-              : 'border-gray-300 hover:border-gray-400 cursor-pointer'
+              ? 'border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-900 cursor-not-allowed'
+              : 'border-slate-300 dark:border-neutral-700 hover:border-slate-400 dark:hover:border-neutral-600 cursor-pointer'
           }`}
           onClick={openFileDialog}
         >
@@ -190,12 +190,12 @@ export default function VideoUpload({
 
           {uploading ? (
             <div className="space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-sm text-gray-600">Uploading video...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Uploading video...</p>
               {uploadProgress > 0 && (
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-slate-200 dark:bg-neutral-800 rounded-full h-2">
                   <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   ></div>
                 </div>
@@ -203,12 +203,12 @@ export default function VideoUpload({
             </div>
           ) : (
             <div className="space-y-2">
-              <Upload className="mx-auto h-8 w-8 text-gray-400" />
+              <Upload className="mx-auto h-8 w-8 text-slate-400" />
               <div>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <span className="font-medium text-indigo-600 dark:text-indigo-400">Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Video files up to {formatFileSize(maxSize)}
                 </p>
               </div>
@@ -217,10 +217,10 @@ export default function VideoUpload({
         </div>
       )}
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+      <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3">
         <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
+          <AlertCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-indigo-800 dark:text-indigo-200">
             <p className="font-medium">Introduction Video Guidelines:</p>
             <ul className="mt-1 space-y-1 text-xs">
               <li>• This video will be accessible to all logged-in users without purchase</li>

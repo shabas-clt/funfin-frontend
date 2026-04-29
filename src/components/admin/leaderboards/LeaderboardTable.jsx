@@ -1,9 +1,9 @@
 export default function LeaderboardTable({ leaderboard, title }) {
   if (!leaderboard || !leaderboard.entries || leaderboard.entries.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">{title}</h3>
-        <div className="text-center py-8 text-gray-500">
+      <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
+        <h3 className="text-[16px] font-bold text-slate-900 dark:text-white mb-4">{title}</h3>
+        <div className="text-center py-8 text-slate-400 dark:text-slate-500">
           <p>No leaderboard data available</p>
         </div>
       </div>
@@ -11,78 +11,78 @@ export default function LeaderboardTable({ leaderboard, title }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-gray-500 mt-1">
+    <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-neutral-800">
+        <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">{title}</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           Top {leaderboard.entries.length} users • Total: {leaderboard.total}
         </p>
       </div>
       
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="overflow-x-auto px-2">
+        <table className="w-full text-[13px] text-left whitespace-nowrap">
+          <thead>
+            <tr className="border-b border-slate-100 dark:border-neutral-800">
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Rank
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 User
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {leaderboard.type === 'coins' ? 'Total Coins' : 'Win Rate'}
               </th>
               {leaderboard.type === 'win-rate' && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   Predictions
                 </th>
               )}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
             {leaderboard.entries.map((entry, index) => (
-              <tr key={entry.userId} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+              <tr key={entry.userId} className="hover:bg-slate-50/80 dark:hover:bg-neutral-900/70 transition-colors">
+                <td className="px-5 py-3.5">
                   <div className="flex items-center">
                     <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                      index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                      index === 1 ? 'bg-gray-100 text-gray-800' :
-                      index === 2 ? 'bg-orange-100 text-orange-800' :
-                      'bg-blue-100 text-blue-800'
+                      index === 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400' :
+                      index === 1 ? 'bg-slate-100 text-slate-800 dark:bg-neutral-800 dark:text-slate-300' :
+                      index === 2 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-400' :
+                      'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-400'
                     }`}>
                       {entry.rank}
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
+                <td className="px-5 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
                       {entry.user?.profilePicUrl ? (
                         <img
-                          className="h-10 w-10 rounded-full object-cover"
+                          className="w-9 h-9 rounded-full object-cover shadow-sm"
                           src={entry.user.profilePicUrl}
                           alt={entry.user.fullName}
                         />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                          <span className="text-gray-600 font-medium">
+                        <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-neutral-700 flex items-center justify-center">
+                          <span className="text-slate-600 dark:text-slate-300 font-medium text-sm">
                             {entry.user?.fullName?.charAt(0) || '?'}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">
+                    <div>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">
                         {entry.user?.fullName || 'Unknown User'}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-[11px] text-slate-400 font-normal">
                         ID: {entry.userId}
                       </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
+                <td className="px-5 py-3.5">
+                  <div className="font-medium text-slate-900 dark:text-white">
                     {leaderboard.type === 'coins' ? 
                       `${entry.totalCoins?.toLocaleString() || 0} coins` :
                       `${(entry.winRate || 0).toFixed(1)}%`
@@ -90,7 +90,7 @@ export default function LeaderboardTable({ leaderboard, title }) {
                   </div>
                 </td>
                 {leaderboard.type === 'win-rate' && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
                     {entry.totalPredictions || 0}
                   </td>
                 )}
