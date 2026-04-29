@@ -7,6 +7,7 @@ import { api } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import CategoriesTable from '../../../components/admin/memes/CategoriesTable';
 import AddCategoryDialog from '../../../components/admin/memes/AddCategoryDialog';
+import EditCategoryDialog from '../../../components/admin/memes/EditCategoryDialog';
 
 export default function ContentCategories() {
   const navigate = useNavigate();
@@ -15,6 +16,8 @@ export default function ContentCategories() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState(null);
 
   const loadCategories = async (isRefresh = false) => {
     if (!isAuthenticated) return;
@@ -58,6 +61,36 @@ export default function ContentCategories() {
       loadCategories(true);
     } catch (error) {
       const message = typeof error === 'string' ? error : 'Failed to delete category';
+      toast.error(message);
+    }
+  };
+
+  const handleEdit = (category) => {
+    setCategoryToEdit(category);
+    setShowEditDialog(true);
+  };
+
+  const handleEditSave = async (id, data) => {
+    try {
+      await api.patch(`/admin/memes/content-categories/${id}`, data);
+      toast.success('Category updated successfully');
+      setShowEditDialog(false);
+      setCategoryToEdit(null);
+      loadCategories(true);
+    } catch (error) {
+      const message = typeof error === 'string' ? error : 'Failed to update category';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  const handleToggleActive = async (id, isActive) => {
+    try {
+      await api.patch(`/admin/memes/content-categories/${id}`, { isActive });
+      toast.success(`Category ${isActive ? 'enabled' : 'disabled'} successfully`);
+      loadCategories(true);
+    } catch (error) {
+      const message = typeof error === 'string' ? error : 'Failed to update category';
       toast.error(message);
     }
   };
@@ -137,6 +170,8 @@ export default function ContentCategories() {
         <CategoriesTable
           categories={categories}
           onDelete={handleDelete}
+          onEdit={handleEdit}
+          onToggleActive={handleToggleActive}
         />
       )}
 
@@ -145,6 +180,17 @@ export default function ContentCategories() {
           title="Add Content Category"
           onSave={handleAdd}
           onCancel={() => setShowAddDialog(false)}
+        />
+      )}
+
+      {showEditDialog && categoryToEdit && (
+        <EditCategoryDialog
+          category={categoryToEdit}
+          onSave={handleEditSave}
+          onCancel={() => {
+            setShowEditDialog(false);
+            setCategoryToEdit(null);
+          }}
         />
       )}
     </div>
