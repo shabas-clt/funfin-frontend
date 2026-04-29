@@ -15,6 +15,15 @@ import {
 
 const PAGE_SIZE = 20;
 
+// Add week number calculation to Date prototype if not exists
+if (!Date.prototype.getWeek) {
+  Date.prototype.getWeek = function() {
+    const start = new Date(this.getFullYear(), 0, 1);
+    const days = Math.floor((this - start) / (24 * 60 * 60 * 1000));
+    return Math.ceil((days + start.getDay() + 1) / 7);
+  };
+}
+
 // For a quiz-style daily challenge the editor is best rendered as a
 // controlled component; react-hook-form gets awkward with dynamic-length
 // option rows and a correct-option radio group.
@@ -35,15 +44,6 @@ function ChallengeEditor({ initial, busy, onSave, onCancel }) {
     endDate: initial.endDate || ''
   });
   const [validationErrors, setValidationErrors] = useState({});
-
-  // Add week number calculation to Date prototype if not exists
-  if (!Date.prototype.getWeek) {
-    Date.prototype.getWeek = function() {
-      const start = new Date(this.getFullYear(), 0, 1);
-      const days = Math.floor((this - start) / (24 * 60 * 60 * 1000));
-      return Math.ceil((days + start.getDay() + 1) / 7);
-    };
-  }
 
   const validateTypeSpecificFields = async () => {
     try {

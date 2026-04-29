@@ -76,7 +76,7 @@ function CreateForm({ onCreated }) {
             />
             <FieldError error={errors.iconUrl} />
           </div>
-          <div>
+          <div className="pt-[22px]">
             <button
               type="submit"
               disabled={isSubmitting}

@@ -110,7 +110,7 @@ export default function NotificationBroadcast() {
   };
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5">
       <div>
         <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-white">
           Notifications

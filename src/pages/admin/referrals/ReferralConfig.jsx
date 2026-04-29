@@ -52,7 +52,7 @@ export default function ReferralConfig() {
       </div>
 
       {loading ? (
-        <div className="max-w-2xl mx-auto space-y-5">
+        <div className="space-y-5">
           <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
             <Skeleton className="h-6 w-48 mb-4" />
             <div className="grid grid-cols-2 gap-4">
