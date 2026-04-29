@@ -1,30 +1,31 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { RefreshCw } from 'lucide-react';
-import { getCoinsLeaderboard, getWinRateLeaderboard } from '../../../api/leaderboards';
+import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import LeaderboardTable from '../../../components/admin/leaderboards/LeaderboardTable';
 
 export default function LeaderboardsPreview() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [coinsLeaderboard, setCoinsLeaderboard] = useState(null);
   const [winRateLeaderboard, setWinRateLeaderboard] = useState(null);
 
   const loadLeaderboards = async (isRefresh = false) => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     if (!isRefresh) setLoading(true);
 
     try {
       const [coinsData, winRateData] = await Promise.all([
-        getCoinsLeaderboard(token, 20),
-        getWinRateLeaderboard(token, 20, 10)
+        api.get('/leaderboard/all-time/coins', { params: { limit: 20 } }),
+        api.get('/leaderboard/all-time/win-rate', { params: { limit: 20, minPredictions: 10 } })
       ]);
       
       setCoinsLeaderboard(coinsData);
       setWinRateLeaderboard(winRateData);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to load leaderboards';
+      const message = typeof error === 'string' ? error : 'Failed to load leaderboards';
       toast.error(message);
       console.error('Leaderboards fetch error:', error);
     } finally {
@@ -34,7 +35,7 @@ export default function LeaderboardsPreview() {
 
   useEffect(() => {
     loadLeaderboards();
-  }, [token]);
+  }, [isAuthenticated]);
 
   const handleRefresh = () => {
     loadLeaderboards(true);
@@ -58,8 +59,28 @@ export default function LeaderboardsPreview() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-neutral-800">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32 mt-2" />
+              </div>
+              <div className="p-6 space-y-3">
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <div key={j} className="flex items-center gap-4">
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <Skeleton className="w-24 h-6" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

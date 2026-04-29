@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { Plus, RefreshCw } from 'lucide-react';
-import { getContentCategories, createContentCategory, deleteContentCategory } from '../../../api/meme';
+import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import CategoriesTable from '../../../components/admin/memes/CategoriesTable';
 import AddCategoryDialog from '../../../components/admin/memes/AddCategoryDialog';
 
 export default function ContentCategories() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   const loadCategories = async (isRefresh = false) => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     if (!isRefresh) setLoading(true);
 
     try {
-      const data = await getContentCategories(token);
+      const data = await api.get('/admin/memes/content-categories');
       setCategories(data || []);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to load categories';
+      const message = typeof error === 'string' ? error : 'Failed to load categories';
       toast.error(message);
       console.error('Categories fetch error:', error);
     } finally {
@@ -30,33 +31,30 @@ export default function ContentCategories() {
 
   useEffect(() => {
     loadCategories();
-  }, [token]);
+  }, [isAuthenticated]);
 
   const handleAdd = async (formData) => {
-    if (!token) return;
-
     try {
-      await createContentCategory(formData, token);
+      await api.post('/admin/memes/content-categories', formData);
       toast.success('Category created successfully');
       setShowAddDialog(false);
       loadCategories(true);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to create category';
+      const message = typeof error === 'string' ? error : 'Failed to create category';
       toast.error(message);
       throw error;
     }
   };
 
   const handleDelete = async (id) => {
-    if (!token) return;
     if (!confirm('Are you sure you want to delete this category?')) return;
 
     try {
-      await deleteContentCategory(id, token);
+      await api.delete(`/admin/memes/content-categories/${id}`);
       toast.success('Category deleted successfully');
       loadCategories(true);
     } catch (error) {
-      const message = error.response?.data?.detail || error.message || 'Failed to delete category';
+      const message = typeof error === 'string' ? error : 'Failed to delete category';
       toast.error(message);
     }
   };
@@ -88,8 +86,19 @@ export default function ContentCategories() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="w-24 h-8" />
+                <Skeleton className="w-32 h-8" />
+                <Skeleton className="w-20 h-6" />
+                <Skeleton className="w-16 h-8" />
+                <div className="flex-1" />
+                <Skeleton className="w-8 h-8 rounded-lg" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <CategoriesTable
