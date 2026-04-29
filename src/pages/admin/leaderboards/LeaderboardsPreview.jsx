@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/api/axios';
+import { clientApi } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import LeaderboardTable from '../../../components/admin/leaderboards/LeaderboardTable';
 
@@ -18,8 +18,8 @@ export default function LeaderboardsPreview() {
 
     try {
       const [coinsData, winRateData] = await Promise.all([
-        api.get('/leaderboard/all-time/coins', { params: { limit: 20 } }),
-        api.get('/leaderboard/all-time/win-rate', { params: { limit: 20, minPredictions: 10 } })
+        clientApi.get('/leaderboard/all-time/coins', { params: { limit: 20 } }),
+        clientApi.get('/leaderboard/all-time/win-rate', { params: { limit: 20, minPredictions: 10 } })
       ]);
       
       setCoinsLeaderboard(coinsData);
