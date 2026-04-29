@@ -32,7 +32,7 @@ export default function ConfigForm({ config, onSave }) {
 
   return (
     <div className="space-y-5">
-      <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6 max-w-2xl mx-auto">
+      <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Current Configuration</h2>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -58,7 +58,7 @@ export default function ConfigForm({ config, onSave }) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6 max-w-2xl mx-auto">
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Update Configuration</h2>
 
         <div className="space-y-4">
