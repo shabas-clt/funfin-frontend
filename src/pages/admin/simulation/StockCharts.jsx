@@ -253,24 +253,15 @@ const StockCharts = () => {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!liveEngineUrl) {
-      setError('Live Engine URL is not configured. Please set VITE_LIVE_ENGINE_URL environment variable.');
+    const authToken = Cookies.get(AUTH_COOKIE_KEY);
+    if (!authToken) {
+      setError('Admin auth token not found. Please log in again.');
       setWsStatus('error');
       return;
     }
     
     disconnectWebSocket();
-    
-    // Determine asset prefix based on market
-    const assetPrefix = selectedMarket === 'US' ? 'stock_' : selectedMarket === 'India' ? 'indian_stock_' : 'uk_stock_';
-    const asset = `${assetPrefix}${selectedStock.symbol.toLowerCase()}`;
-    
-    // Connect to live-engine WebSocket
-    const wsRoot = liveEngineUrl.startsWith('https://')
-      ? liveEngineUrl.replace('https://', 'wss://')
-      : liveEngineUrl.replace('http://', 'ws://');
-    const wsUrl = `${wsRoot}/api/ws/stream?asset=${asset}`;
-    
+    const wsUrl = toWsUrl(apiBase, authToken);
     setWsStatus('connecting');
 
     const ws = new WebSocket(wsUrl);
@@ -278,42 +269,91 @@ const StockCharts = () => {
 
     ws.onopen = () => {
       setWsStatus('connected');
-      console.log(`✅ Connected to live-engine WebSocket: ${asset}`);
+      // Send subscription message with stock symbol and timeframe
+      ws.send(JSON.stringify({ 
+        type: 'subscribe', 
+        stock: selectedStock.symbol.toLowerCase(),
+        timeframe: selectedView.wsTimeframe
+      }));
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         
-        // Handle error messages
-        if (message.error) {
-          console.error('❌ WebSocket error:', message.error);
-          setError(message.error || 'WebSocket error');
+        // Handle welcome message
+        if (message.type === 'welcome') {
           return;
         }
         
-        // Handle tick messages from live-engine
-        // Format: { type: "tick", asset: "stock_aapl", symbol: "AAPL", price: 273.40, volume: 1000, timestamp: "2024-...", marketStatus: "open" }
-        if (message.type !== 'tick') {
+        // Handle subscribed confirmation
+        if (message.type === 'subscribed') {
+          if (typeof message.price === 'number') {
+            setLatestPrice(message.price);
+          }
+          return;
+        }
+        
+        // Handle error messages
+        if (message.type === 'error') {
+          console.error('❌ WebSocket error:', message.message);
+          setError(message.message || 'WebSocket error');
+          return;
+        }
+        
+        // Handle priceTick messages (real-time updates with candles)
+        if (
+          message.type !== 'priceTick' ||
+          message.stock !== selectedStock.symbol.toLowerCase() ||
+          message.timeframe !== selectedView.wsTimeframe
+        ) {
           return;
         }
 
         const price = Number(message.price);
         if (!Number.isFinite(price)) return;
         setLatestPrice(price);
-        
-        // Update market status from tick
-        if (message.marketStatus) {
-          setMarketStatus(message.marketStatus);
-        }
 
         if (selectedView.id === '1s') {
           // Build 1-second candles from ticks
-          const tickMs = parseBackendTimestamp(message.timestamp) ?? Date.now();
+          const tickMs = parseBackendTimestamp(message.asOf) ?? Date.now();
           setCandles((prev) => appendTickToOneSecondCandles(prev, price, tickMs));
+          return;
         }
-        // For 1m, 5m, 15m: we rely on the candles API endpoint, not WebSocket aggregation
-        // The live-engine doesn't send aggregated candles via WebSocket, only ticks
+
+        // For 1m, 5m, 15m: use aggregated candle from backend
+        if (!message.candle) return;
+        const candle = message.candle;
+        if (
+          !isFiniteNumber(candle.open) ||
+          !isFiniteNumber(candle.high) ||
+          !isFiniteNumber(candle.low) ||
+          !isFiniteNumber(candle.close)
+        ) {
+          return;
+        }
+        const incomingSec = asUnixSeconds(candle.timestamp);
+        if (incomingSec === null) return;
+        
+        setCandles((prev) => {
+          const next = [...prev];
+          // Match on bucketed unix seconds
+          const idx = next.findIndex((c) => asUnixSeconds(c.timestamp) === incomingSec);
+          const merged = {
+            timestamp: candle.timestamp,
+            open: Number(candle.open),
+            high: Number(candle.high),
+            low: Number(candle.low),
+            close: Number(candle.close),
+            volume: isFiniteNumber(candle.volume) ? Number(candle.volume) : 0,
+          };
+          if (idx >= 0) {
+            next[idx] = merged;
+          } else {
+            next.push(merged);
+          }
+          return next.slice(-600);
+        });
       } catch (err) {
         console.error('WebSocket message error:', err);
       }
@@ -326,30 +366,24 @@ const StockCharts = () => {
     ws.onclose = () => {
       setWsStatus('disconnected');
     };
-  }, [liveEngineUrl, selectedStock, selectedMarket, selectedView, disconnectWebSocket]);
+  }, [apiBase, selectedStock, selectedView, disconnectWebSocket]);
 
   useEffect(() => {
+    const authToken = Cookies.get(AUTH_COOKIE_KEY);
+    if (!authToken) {
+      disconnectWebSocket();
+      return;
+    }
+    
     loadMarketStatus();
     loadCandles();
     connectWebSocket();
-    
-    // For 1m, 5m, 15m views: poll candles API every 5 seconds to get updated aggregated candles
-    let pollInterval;
-    if (selectedView.id !== '1s') {
-      pollInterval = setInterval(() => {
-        loadCandles();
-      }, 5000); // Poll every 5 seconds (matches backend persist interval)
-    }
 
-    return () => {
-      disconnectWebSocket();
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-    };
-  }, [selectedStock, viewId, selectedMarket, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket, selectedView.id]);
+    return () => disconnectWebSocket();
+  }, [selectedStock, viewId, selectedMarket, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket]);
 
-  const displayError = error;
+  const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
+  const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
 
   useEffect(() => {
     if (!chartContainerRef.current) return undefined;
