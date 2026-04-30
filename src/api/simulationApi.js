@@ -30,21 +30,38 @@ export const simulationApi = {
   },
 };
 
-// Stock list (12 US stocks)
-export const STOCK_LIST = [
-  { symbol: 'AAPL', name: 'Apple Inc.' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.' },
-  { symbol: 'TSLA', name: 'Tesla Inc.' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.' },
-  { symbol: 'META', name: 'Meta Platforms Inc.' },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.' },
-  { symbol: 'NFLX', name: 'Netflix Inc.' },
-  { symbol: 'AMD', name: 'Advanced Micro Devices' },
-  { symbol: 'INTC', name: 'Intel Corp.' },
-  { symbol: 'DIS', name: 'Walt Disney Co.' },
-  { symbol: 'BA', name: 'Boeing Co.' },
+// US Stock list (12 stocks)
+export const US_STOCK_LIST = [
+  { symbol: 'AAPL', name: 'Apple Inc.', market: 'US' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.', market: 'US' },
+  { symbol: 'MSFT', name: 'Microsoft Corp.', market: 'US' },
+  { symbol: 'TSLA', name: 'Tesla Inc.', market: 'US' },
+  { symbol: 'AMZN', name: 'Amazon.com Inc.', market: 'US' },
+  { symbol: 'META', name: 'Meta Platforms Inc.', market: 'US' },
+  { symbol: 'NVDA', name: 'NVIDIA Corp.', market: 'US' },
+  { symbol: 'NFLX', name: 'Netflix Inc.', market: 'US' },
+  { symbol: 'AMD', name: 'Advanced Micro Devices', market: 'US' },
+  { symbol: 'INTC', name: 'Intel Corp.', market: 'US' },
+  { symbol: 'DIS', name: 'Walt Disney Co.', market: 'US' },
+  { symbol: 'BA', name: 'Boeing Co.', market: 'US' },
 ];
+
+// Indian Stock list (10 stocks)
+export const INDIAN_STOCK_LIST = [
+  { symbol: 'RELIANCE', name: 'Reliance Industries', market: 'India' },
+  { symbol: 'TCS', name: 'Tata Consultancy Services', market: 'India' },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank', market: 'India' },
+  { symbol: 'INFY', name: 'Infosys', market: 'India' },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank', market: 'India' },
+  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever', market: 'India' },
+  { symbol: 'BHARTIARTL', name: 'Bharti Airtel', market: 'India' },
+  { symbol: 'ITC', name: 'ITC Limited', market: 'India' },
+  { symbol: 'SBIN', name: 'State Bank of India', market: 'India' },
+  { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', market: 'India' },
+];
+
+// Combined stock list (for backward compatibility)
+export const STOCK_LIST = US_STOCK_LIST;
 
 // Leverage options
 export const LEVERAGE_OPTIONS = [

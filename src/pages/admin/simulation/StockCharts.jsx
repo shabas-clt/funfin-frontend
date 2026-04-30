@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
 import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
-import { STOCK_LIST } from '../../../api/simulationApi';
+import { US_STOCK_LIST, INDIAN_STOCK_LIST } from '../../../api/simulationApi';
 
 const VIEW_OPTIONS = [
   { id: '1s', label: '1s', apiTimeframe: '1s', limit: 320, secondsVisible: true },
@@ -144,7 +144,8 @@ function formatLocalFromChartTime(time, showSeconds = true) {
 }
 
 const StockCharts = () => {
-  const [selectedStock, setSelectedStock] = useState(STOCK_LIST[0]);
+  const [selectedMarket, setSelectedMarket] = useState('US');
+  const [selectedStock, setSelectedStock] = useState(US_STOCK_LIST[0]);
   const [viewId, setViewId] = useState('1s');
   const [candles, setCandles] = useState([]);
   const [latestPrice, setLatestPrice] = useState(null);
@@ -165,7 +166,9 @@ const StockCharts = () => {
     [viewId]
   );
 
-  const asset = `stock_${selectedStock.symbol.toLowerCase()}`;
+  const currentStockList = selectedMarket === 'US' ? US_STOCK_LIST : INDIAN_STOCK_LIST;
+  const assetPrefix = selectedMarket === 'US' ? 'stock_' : 'indian_stock_';
+  const asset = `${assetPrefix}${selectedStock.symbol.toLowerCase()}`;
 
   // Listen for theme changes
   useEffect(() => {
@@ -183,7 +186,7 @@ const StockCharts = () => {
 
   useEffect(() => {
     shouldAutoFitRef.current = true;
-  }, [selectedStock, viewId]);
+  }, [selectedStock, viewId, selectedMarket]);
 
   const loadMarketStatus = useCallback(async () => {
     if (!liveEngineUrl) return;
@@ -507,10 +510,13 @@ const StockCharts = () => {
             <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <div>
               <p className="font-medium text-amber-900 dark:text-amber-200">
-                US Stock Market is Currently Closed
+                {selectedMarket === 'US' ? 'US' : 'Indian'} Stock Market is Currently Closed
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-300">
-                Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday. Live data will resume when market opens.
+                {selectedMarket === 'US' 
+                  ? 'Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday.'
+                  : 'Market hours: 9:15 AM - 3:30 PM IST, Monday-Friday.'
+                } Live data will resume when market opens.
               </p>
             </div>
           </div>
@@ -547,7 +553,36 @@ const StockCharts = () => {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {STOCK_LIST.map((stock) => (
+          <button
+            onClick={() => {
+              setSelectedMarket('US');
+              setSelectedStock(US_STOCK_LIST[0]);
+            }}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+              selectedMarket === 'US'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
+            }`}
+          >
+            🇺🇸 US Market
+          </button>
+          <button
+            onClick={() => {
+              setSelectedMarket('India');
+              setSelectedStock(INDIAN_STOCK_LIST[0]);
+            }}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+              selectedMarket === 'India'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
+            }`}
+          >
+            🇮🇳 Indian Market
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {currentStockList.map((stock) => (
             <button
               key={stock.symbol}
               onClick={() => setSelectedStock(stock)}
