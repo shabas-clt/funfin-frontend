@@ -171,6 +171,24 @@ const StockCharts = () => {
     shouldAutoFitRef.current = true;
   }, [selectedStock, viewId]);
 
+  const loadMarketStatus = useCallback(async () => {
+    if (!liveEngineUrl) return;
+    
+    try {
+      const response = await fetch(`${liveEngineUrl}/api/stocks`);
+      const stocks = await response.json();
+      
+      if (Array.isArray(stocks) && stocks.length > 0) {
+        const status = stocks[0].marketStatus;
+        if (status) {
+          setMarketStatus(status);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch market status:', err);
+    }
+  }, [liveEngineUrl]);
+
   const loadCandles = useCallback(async () => {
     setError('');
     
@@ -290,11 +308,12 @@ const StockCharts = () => {
       return;
     }
     
+    loadMarketStatus();
     loadCandles();
     connectWebSocket();
 
     return () => disconnectWebSocket();
-  }, [selectedStock, viewId, loadCandles, connectWebSocket, disconnectWebSocket]);
+  }, [selectedStock, viewId, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket]);
 
   const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
   const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
