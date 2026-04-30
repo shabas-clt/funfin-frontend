@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
 import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
-import { US_STOCK_LIST, INDIAN_STOCK_LIST } from '../../../api/simulationApi';
+import { US_STOCK_LIST, INDIAN_STOCK_LIST, UK_STOCK_LIST } from '../../../api/simulationApi';
 
 const VIEW_OPTIONS = [
   { id: '1s', label: '1s', apiTimeframe: '1s', wsTimeframe: '1s', limit: 320, secondsVisible: true },
@@ -166,7 +166,7 @@ const StockCharts = () => {
     [viewId]
   );
 
-  const currentStockList = selectedMarket === 'US' ? US_STOCK_LIST : INDIAN_STOCK_LIST;
+  const currentStockList = selectedMarket === 'US' ? US_STOCK_LIST : selectedMarket === 'India' ? INDIAN_STOCK_LIST : UK_STOCK_LIST;
 
   // Listen for theme changes
   useEffect(() => {
@@ -191,7 +191,7 @@ const StockCharts = () => {
     
     try {
       // Fetch market-specific status based on selected market
-      const endpoint = selectedMarket === 'US' ? '/api/stocks/us' : '/api/stocks/indian';
+      const endpoint = selectedMarket === 'US' ? '/api/stocks/us' : selectedMarket === 'India' ? '/api/stocks/indian' : '/api/stocks/uk';
       const response = await fetch(`${liveEngineUrl}${endpoint}`);
       const data = await response.json();
       
@@ -214,7 +214,7 @@ const StockCharts = () => {
     }
     
     // Determine asset prefix based on market
-    const assetPrefix = selectedMarket === 'US' ? 'stock_' : 'indian_stock_';
+    const assetPrefix = selectedMarket === 'US' ? 'stock_' : selectedMarket === 'India' ? 'indian_stock_' : 'uk_stock_';
     const asset = `${assetPrefix}${selectedStock.symbol.toLowerCase()}`;
     
     try {
@@ -560,12 +560,14 @@ const StockCharts = () => {
             <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <div>
               <p className="font-medium text-amber-900 dark:text-amber-200">
-                {selectedMarket === 'US' ? 'US' : 'Indian'} Stock Market is Currently Closed
+                {selectedMarket === 'US' ? 'US' : selectedMarket === 'India' ? 'Indian' : 'UK'} Stock Market is Currently Closed
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-300">
                 {selectedMarket === 'US' 
                   ? 'Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday.'
-                  : 'Market hours: 9:15 AM - 3:30 PM IST, Monday-Friday.'
+                  : selectedMarket === 'India'
+                  ? 'Market hours: 9:15 AM - 3:30 PM IST, Monday-Friday.'
+                  : 'Market hours: 8:00 AM - 4:30 PM GMT, Monday-Friday.'
                 } Live data will resume when market opens.
               </p>
             </div>
@@ -628,6 +630,19 @@ const StockCharts = () => {
             }`}
           >
             🇮🇳 Indian Market
+          </button>
+          <button
+            onClick={() => {
+              setSelectedMarket('UK');
+              setSelectedStock(UK_STOCK_LIST[0]);
+            }}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+              selectedMarket === 'UK'
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
+            }`}
+          >
+            🇬🇧 UK Market
           </button>
         </div>
 
