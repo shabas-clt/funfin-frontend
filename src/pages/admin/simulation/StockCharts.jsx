@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Cookies from 'js-cookie';
 import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { US_STOCK_LIST, INDIAN_STOCK_LIST } from '../../../api/simulationApi';
 
 const VIEW_OPTIONS = [
-  { id: '1s', label: '1s', apiTimeframe: '1s', limit: 320, secondsVisible: true },
-  { id: '1m', label: '1m', apiTimeframe: '1m', limit: 300, secondsVisible: false },
-  { id: '5m', label: '5m', apiTimeframe: '5m', limit: 220, secondsVisible: false },
-  { id: '15m', label: '15m', apiTimeframe: '15m', limit: 180, secondsVisible: false },
+  { id: '1s', label: '1s', apiTimeframe: '1s', wsTimeframe: '1s', limit: 320, secondsVisible: true },
+  { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 300, secondsVisible: false },
+  { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 220, secondsVisible: false },
+  { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
 ];
+
+const AUTH_COOKIE_KEY = 'ff_admin_token';
 
 const DEFAULT_VISIBLE_BARS = {
   '1s': 80,
@@ -17,6 +20,20 @@ const DEFAULT_VISIBLE_BARS = {
   '15m': 80,
 };
 
+function getClientApiBaseUrl() {
+  const configured = import.meta.env.VITE_CLIENT_API_URL;
+  if (configured) return configured.replace(/\/$/, '');
+
+  const adminApi = import.meta.env.VITE_API_URL || 'http://localhost:5002/api/v1';
+  if (adminApi.includes('admin-api.')) {
+    return adminApi.replace('admin-api.', 'api.');
+  }
+  if (adminApi.includes(':5002')) {
+    return adminApi.replace(':5002', ':5001');
+  }
+  return adminApi;
+}
+
 function getLiveEngineUrl() {
   const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
   if (!configured) {
@@ -24,6 +41,14 @@ function getLiveEngineUrl() {
     return null;
   }
   return configured.replace(/\/$/, '');
+}
+
+function toWsUrl(apiBase, token) {
+  const root = apiBase.replace(/\/api\/v1\/?$/, '');
+  const wsRoot = root.startsWith('https://')
+    ? root.replace('https://', 'wss://')
+    : root.replace('http://', 'ws://');
+  return `${wsRoot}/api/v1/simulation/stream?token=${encodeURIComponent(token)}`;
 }
 
 function parseBackendTimestamp(value) {
@@ -134,6 +159,7 @@ const StockCharts = () => {
   const candleSeriesRef = useRef(null);
   const shouldAutoFitRef = useRef(true);
 
+  const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
   const selectedView = useMemo(
     () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
@@ -141,8 +167,6 @@ const StockCharts = () => {
   );
 
   const currentStockList = selectedMarket === 'US' ? US_STOCK_LIST : INDIAN_STOCK_LIST;
-  const assetPrefix = selectedMarket === 'US' ? 'stock_' : 'indian_stock_';
-  const asset = `${assetPrefix}${selectedStock.symbol.toLowerCase()}`;
 
   // Listen for theme changes
   useEffect(() => {
@@ -189,6 +213,10 @@ const StockCharts = () => {
       return;
     }
     
+    // Determine asset prefix based on market
+    const assetPrefix = selectedMarket === 'US' ? 'stock_' : 'indian_stock_';
+    const asset = `${assetPrefix}${selectedStock.symbol.toLowerCase()}`;
+    
     try {
       const response = await fetch(
         `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`
@@ -216,7 +244,7 @@ const StockCharts = () => {
       console.error('❌ Error loading candles:', err);
       setError(err?.message || 'Unable to fetch candle history');
     }
-  }, [liveEngineUrl, asset, selectedView]);
+  }, [liveEngineUrl, selectedStock, selectedMarket, selectedView]);
 
   const disconnectWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -226,79 +254,140 @@ const StockCharts = () => {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!liveEngineUrl) {
-      setError('Live Engine URL is not configured.');
+    const authToken = Cookies.get(AUTH_COOKIE_KEY);
+    if (!authToken) {
+      setError('Admin auth token not found. Please log in again.');
       setWsStatus('error');
       return;
     }
     
     disconnectWebSocket();
-    
-    // Connect directly to Live-Engine WebSocket with asset in URL
-    const wsRoot = liveEngineUrl.startsWith('https://')
-      ? liveEngineUrl.replace('https://', 'wss://')
-      : liveEngineUrl.replace('http://', 'ws://');
-    const wsUrl = `${wsRoot}/api/ws/stream?asset=${asset}`;
-    
-    console.log(`🔌 Connecting to Live-Engine WebSocket: ${wsUrl}`);
+    const wsUrl = toWsUrl(apiBase, authToken);
     setWsStatus('connecting');
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log(`✅ WebSocket connected to ${asset}`);
       setWsStatus('connected');
-      // No subscription message needed - asset is in URL parameter
+      // Send subscription message with stock symbol and timeframe
+      ws.send(JSON.stringify({ 
+        type: 'subscribe', 
+        stock: selectedStock.symbol.toLowerCase(),
+        timeframe: selectedView.wsTimeframe
+      }));
+      console.log(`✅ Subscribed to ${selectedStock.symbol.toLowerCase()}:${selectedView.wsTimeframe}`);
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         
-        // Handle error messages
-        if (message.error) {
-          console.error('❌ WebSocket error:', message.error);
-          setError(message.error);
+        // Handle welcome message
+        if (message.type === 'welcome') {
+          console.log('📡 Connected to simulation stream');
           return;
         }
         
-        // Live-Engine sends: { type: "tick", asset: "stock_aapl", price: 150.25, timestamp: "..." }
-        if (message.type === 'tick' && typeof message.price === 'number') {
-          const price = Number(message.price);
-          if (!Number.isFinite(price)) return;
-          
-          console.log(`📊 Received tick for ${message.asset}: $${price}`);
-          setLatestPrice(price);
-
-          if (selectedView.id === '1s') {
-            const tickMs = parseBackendTimestamp(message.timestamp) ?? Date.now();
-            setCandles((prev) => appendTickToOneSecondCandles(prev, price, tickMs));
+        // Handle subscribed confirmation
+        if (message.type === 'subscribed') {
+          console.log(`✅ Subscribed confirmed for ${message.stock}:${message.timeframe}`);
+          if (typeof message.price === 'number') {
+            setLatestPrice(message.price);
           }
+          return;
         }
+        
+        // Handle error messages
+        if (message.type === 'error') {
+          console.error('❌ WebSocket error:', message.message);
+          setError(message.message || 'WebSocket error');
+          return;
+        }
+        
+        // Handle priceTick messages (real-time updates with candles)
+        if (
+          message.type !== 'priceTick' ||
+          message.stock !== selectedStock.symbol.toLowerCase() ||
+          message.timeframe !== selectedView.wsTimeframe
+        ) {
+          return;
+        }
+
+        const price = Number(message.price);
+        if (!Number.isFinite(price)) return;
+        setLatestPrice(price);
+
+        if (selectedView.id === '1s') {
+          // Build 1-second candles from ticks
+          const tickMs = parseBackendTimestamp(message.asOf) ?? Date.now();
+          setCandles((prev) => appendTickToOneSecondCandles(prev, price, tickMs));
+          return;
+        }
+
+        // For 1m, 5m, 15m: use aggregated candle from backend
+        if (!message.candle) return;
+        const candle = message.candle;
+        if (
+          !isFiniteNumber(candle.open) ||
+          !isFiniteNumber(candle.high) ||
+          !isFiniteNumber(candle.low) ||
+          !isFiniteNumber(candle.close)
+        ) {
+          return;
+        }
+        const incomingSec = asUnixSeconds(candle.timestamp);
+        if (incomingSec === null) return;
+        
+        setCandles((prev) => {
+          const next = [...prev];
+          // Match on bucketed unix seconds
+          const idx = next.findIndex((c) => asUnixSeconds(c.timestamp) === incomingSec);
+          const merged = {
+            timestamp: candle.timestamp,
+            open: Number(candle.open),
+            high: Number(candle.high),
+            low: Number(candle.low),
+            close: Number(candle.close),
+            volume: isFiniteNumber(candle.volume) ? Number(candle.volume) : 0,
+          };
+          if (idx >= 0) {
+            next[idx] = merged;
+          } else {
+            next.push(merged);
+          }
+          return next.slice(-600);
+        });
       } catch (err) {
         console.error('WebSocket message error:', err);
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
+    ws.onerror = () => {
       setWsStatus('error');
     };
 
     ws.onclose = () => {
-      console.log(`🔌 WebSocket disconnected from ${asset}`);
       setWsStatus('disconnected');
     };
-  }, [liveEngineUrl, asset, selectedView, disconnectWebSocket]);
+  }, [apiBase, selectedStock, selectedView, disconnectWebSocket]);
 
   useEffect(() => {
+    const authToken = Cookies.get(AUTH_COOKIE_KEY);
+    if (!authToken) {
+      disconnectWebSocket();
+      return;
+    }
+    
     loadMarketStatus();
     loadCandles();
     connectWebSocket();
 
     return () => disconnectWebSocket();
   }, [selectedStock, viewId, selectedMarket, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket]);
+
+  const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
+  const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
 
   useEffect(() => {
     if (!chartContainerRef.current) return undefined;
@@ -491,7 +580,7 @@ const StockCharts = () => {
               Stock Live Charts
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Real-time stock prices routed through FastAPI backend.
+              Real-time stock prices with candle aggregation via FastAPI backend.
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -508,7 +597,7 @@ const StockCharts = () => {
             )}
             <Activity className="ml-2 h-4 w-4 text-indigo-500" />
             <span className="font-medium text-slate-900 dark:text-white">
-              {latestPrice ? `$${latestPrice.toFixed(2)}` : '-'}
+              {latestPrice ? `${latestPrice.toFixed(2)}` : '-'}
             </span>
           </div>
         </div>
@@ -573,7 +662,7 @@ const StockCharts = () => {
             </button>
           ))}
         </div>
-        {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
+        {displayError ? <p className="mt-3 text-sm text-rose-500">{displayError}</p> : null}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
