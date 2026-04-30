@@ -14,7 +14,7 @@ const VIEW_OPTIONS = [
 const AUTH_COOKIE_KEY = 'ff_admin_token';
 
 const DEFAULT_VISIBLE_BARS = {
-  '1s': 80,
+  '1s': 200,  // Show ~3.3 minutes of data
   '1m': 80,
   '5m': 80,
   '15m': 80,
