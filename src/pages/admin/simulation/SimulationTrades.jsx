@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Search, Filter, RefreshCw, TrendingUp, TrendingDown, Clock } from 'lucide-react';
-import { simulationApi, STOCK_LIST, TRADE_STATUS } from '../../../api/simulationApi';
+import { simulationApi, US_STOCK_LIST, INDIAN_STOCK_LIST, UK_STOCK_LIST, TRADE_STATUS } from '../../../api/simulationApi';
+
+// Combined stock list
+const ALL_STOCKS = [...US_STOCK_LIST, ...INDIAN_STOCK_LIST, ...UK_STOCK_LIST];
 
 const SimulationTrades = () => {
   const [trades, setTrades] = useState([]);
@@ -26,7 +29,7 @@ const SimulationTrades = () => {
       if (filters.user_id) params.user_id = filters.user_id;
 
       const data = await simulationApi.getTrades(params);
-      setTrades(Array.isArray(data) ? data : []);
+      setTrades(data.trades || []);
     } catch (err) {
       console.error('Error loading trades:', err);
       setError(typeof err === 'string' ? err : 'Failed to load trades');
@@ -135,7 +138,7 @@ const SimulationTrades = () => {
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white"
           >
             <option value="">All Stocks</option>
-            {STOCK_LIST.map((stock) => (
+            {ALL_STOCKS.map((stock) => (
               <option key={stock.symbol} value={stock.symbol}>
                 {stock.symbol} - {stock.name}
               </option>
@@ -169,7 +172,7 @@ const SimulationTrades = () => {
                   Trade ID
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                  User ID
+                  Username
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                   Stock
@@ -178,7 +181,7 @@ const SimulationTrades = () => {
                   Type
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                  Amount
+                  Stake
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                   Leverage
@@ -215,50 +218,50 @@ const SimulationTrades = () => {
                 </tr>
               ) : (
                 filteredTrades.map((trade) => {
-                  const pnl = trade.pnl || 0;
+                  const pnl = trade.profitLoss || 0;
                   const pnlColor = pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
                   const PnlIcon = pnl >= 0 ? TrendingUp : TrendingDown;
 
                   return (
-                    <tr key={trade.id} className="hover:bg-slate-50 dark:hover:bg-neutral-900/50">
+                    <tr key={trade.tradeId} className="hover:bg-slate-50 dark:hover:bg-neutral-900/50">
                       <td className="px-4 py-3 text-sm font-mono text-slate-900 dark:text-white">
-                        {trade.id?.substring(0, 8)}...
+                        {trade.tradeId?.substring(0, 8)}...
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono text-slate-900 dark:text-white">
-                        {trade.user_id?.substring(0, 8)}...
+                      <td className="px-4 py-3 text-sm text-slate-900 dark:text-white">
+                        {trade.username || 'Unknown'}
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                        {trade.stock_symbol}
+                        {trade.stockSymbol}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                            trade.trade_type === 'buy'
+                            trade.direction === 'buy'
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                               : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                           }`}
                         >
-                          {trade.trade_type === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                          {trade.trade_type.toUpperCase()}
+                          {trade.direction === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {trade.direction.toUpperCase()}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-medium text-slate-900 dark:text-white">
-                        {formatCurrency(trade.amount)}
+                        {trade.stakeCoins} coins
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-400">
-                        X{trade.leverage}
+                        {trade.leverage}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        ${formatCurrency(trade.entry_price)}
+                        ${formatCurrency(trade.entryPrice)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        {trade.exit_price ? `$${formatCurrency(trade.exit_price)}` : '-'}
+                        {trade.exitPrice ? `$${formatCurrency(trade.exitPrice)}` : '-'}
                       </td>
                       <td className={`px-4 py-3 text-right text-sm font-semibold ${pnlColor}`}>
                         {trade.status === TRADE_STATUS.CLOSED ? (
                           <span className="inline-flex items-center gap-1">
                             <PnlIcon className="h-3 w-3" />
-                            {formatCurrency(Math.abs(pnl))}
+                            {pnl >= 0 ? '+' : ''}{pnl} coins
                           </span>
                         ) : (
                           '-'
@@ -277,7 +280,7 @@ const SimulationTrades = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
-                        {formatDate(trade.opened_at)}
+                        {formatDate(trade.openedAt)}
                       </td>
                     </tr>
                   );
