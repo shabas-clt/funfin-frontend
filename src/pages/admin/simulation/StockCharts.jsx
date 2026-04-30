@@ -333,12 +333,12 @@ const StockCharts = () => {
     loadCandles();
     connectWebSocket();
     
-    // For 1m, 5m, 15m views: poll candles API every 10 seconds to get updated aggregated candles
+    // For 1m, 5m, 15m views: poll candles API every 5 seconds to get updated aggregated candles
     let pollInterval;
     if (selectedView.id !== '1s') {
       pollInterval = setInterval(() => {
         loadCandles();
-      }, 10000); // Poll every 10 seconds
+      }, 5000); // Poll every 5 seconds (matches backend persist interval)
     }
 
     return () => {
@@ -501,14 +501,18 @@ const StockCharts = () => {
       return;
     }
 
-    if (deduped.length && chartRef.current && shouldAutoFitRef.current) {
-      const visibleBars = DEFAULT_VISIBLE_BARS[selectedView.id] ?? 60;
-      const from = Math.max(0, deduped.length - visibleBars);
-      const to = deduped.length + 1;
-      chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+    if (deduped.length && chartRef.current) {
+      if (shouldAutoFitRef.current) {
+        // Initial load: fit to visible bars
+        const visibleBars = DEFAULT_VISIBLE_BARS[selectedView.id] ?? 60;
+        const from = Math.max(0, deduped.length - visibleBars);
+        const to = deduped.length + 1;
+        chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+        shouldAutoFitRef.current = false;
+      }
+      // Always scroll to latest candle for live updates
       chartRef.current.timeScale().scrollToRealTime();
       candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
-      shouldAutoFitRef.current = false;
     }
   }, [candles, selectedView.id]);
 
