@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, AreaSeries } from 'lightweight-charts';
 import { Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { STOCK_LIST } from '../../../api/simulationApi';
 
@@ -155,14 +155,19 @@ const StockChart = ({ symbol, name }) => {
       handleScale: false,
     });
 
-    const series = chart.addAreaSeries({
+    const areaOptions = {
       lineColor: '#22c55e',
       topColor: 'rgba(34, 197, 94, 0.3)',
       bottomColor: 'rgba(34, 197, 94, 0.0)',
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
-    });
+    };
+
+    // Use fallback pattern for API compatibility (same as LiveChart.jsx)
+    const series = typeof chart.addAreaSeries === 'function'
+      ? chart.addAreaSeries(areaOptions)
+      : chart.addSeries(AreaSeries, areaOptions);
 
     chartRef.current = chart;
     seriesRef.current = series;
