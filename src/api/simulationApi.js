@@ -60,6 +60,20 @@ export const INDIAN_STOCK_LIST = [
   { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', market: 'India' },
 ];
 
+// UK Stock list (10 stocks)
+export const UK_STOCK_LIST = [
+  { symbol: 'HSBA', name: 'HSBC Holdings', market: 'UK' },
+  { symbol: 'BP', name: 'BP plc', market: 'UK' },
+  { symbol: 'SHEL', name: 'Shell plc', market: 'UK' },
+  { symbol: 'VOD', name: 'Vodafone Group', market: 'UK' },
+  { symbol: 'AZN', name: 'AstraZeneca', market: 'UK' },
+  { symbol: 'ULVR', name: 'Unilever', market: 'UK' },
+  { symbol: 'GSK', name: 'GSK plc', market: 'UK' },
+  { symbol: 'DGE', name: 'Diageo', market: 'UK' },
+  { symbol: 'BARC', name: 'Barclays', market: 'UK' },
+  { symbol: 'LLOY', name: 'Lloyds Banking Group', market: 'UK' },
+];
+
 // Combined stock list (for backward compatibility)
 export const STOCK_LIST = US_STOCK_LIST;
 
