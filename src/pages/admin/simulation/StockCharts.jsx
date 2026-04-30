@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createChart, ColorType, AreaSeries } from 'lightweight-charts';
-import { Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
+import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { STOCK_LIST } from '../../../api/simulationApi';
+
+const VIEW_OPTIONS = [
+  { id: '1s', label: '1s', apiTimeframe: '1s', wsTimeframe: '1s', limit: 320, secondsVisible: true },
+  { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 300, secondsVisible: false },
+  { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 220, secondsVisible: false },
+  { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
+];
+
+const DEFAULT_VISIBLE_BARS = {
+  '1s': 80,
+  '1m': 80,
+  '5m': 80,
+  '15m': 80,
+};
 
 function getLiveEngineUrl() {
   const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
@@ -37,21 +51,144 @@ function asUnixSeconds(value) {
   return Math.floor(ms / 1000);
 }
 
-// Single stock chart component
-const StockChart = ({ symbol, name }) => {
-  const [price, setPrice] = useState(null);
-  const [priceChange, setPriceChange] = useState(0);
+function isFiniteNumber(value) {
+  return Number.isFinite(Number(value));
+}
+
+function appendTickToOneSecondCandles(prev, tickPrice, tickMs) {
+  const bucketMs = Math.floor(tickMs / 1000) * 1000;
+  const bucketIso = new Date(bucketMs).toISOString();
+  const price = Number(tickPrice);
+  if (!Number.isFinite(price)) return prev;
+
+  if (!prev.length) {
+    return [
+      {
+        timestamp: bucketIso,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume: 1,
+      },
+    ];
+  }
+
+  const next = [...prev];
+  const last = next[next.length - 1];
+  const lastMs = parseBackendTimestamp(last.timestamp);
+  if (lastMs === null) return prev;
+
+  if (bucketMs === lastMs) {
+    next[next.length - 1] = {
+      ...last,
+      high: Math.max(Number(last.high), price),
+      low: Math.min(Number(last.low), price),
+      close: price,
+      volume: (Number(last.volume) || 0) + 1,
+    };
+    return next.slice(-600);
+  }
+
+  let cursor = lastMs + 1000;
+  let prevClose = Number(last.close);
+  while (cursor < bucketMs) {
+    const flatIso = new Date(cursor).toISOString();
+    next.push({
+      timestamp: flatIso,
+      open: prevClose,
+      high: prevClose,
+      low: prevClose,
+      close: prevClose,
+      volume: 0,
+    });
+    cursor += 1000;
+  }
+
+  next.push({
+    timestamp: bucketIso,
+    open: prevClose,
+    high: Math.max(prevClose, price),
+    low: Math.min(prevClose, price),
+    close: price,
+    volume: 1,
+  });
+  return next.slice(-600);
+}
+
+function formatLocalFromChartTime(time, showSeconds = true) {
+  if (typeof time !== 'number') return '';
+  return new Date(time * 1000).toLocaleTimeString('en-IN', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(showSeconds ? { second: '2-digit' } : {}),
+  });
+}
+
+const StockCharts = () => {
+  const [selectedStock, setSelectedStock] = useState(STOCK_LIST[0]); // Default to first stock
+  const [viewId, setViewId] = useState('1s');
+  const [candles, setCandles] = useState([]);
+  const [latestPrice, setLatestPrice] = useState(null);
   const [wsStatus, setWsStatus] = useState('idle');
   const [marketStatus, setMarketStatus] = useState('unknown');
+  const [error, setError] = useState('');
+  const wsRef = useRef(null);
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
-  const seriesRef = useRef(null);
-  const wsRef = useRef(null);
-  const pricesRef = useRef([]);
+  const candleSeriesRef = useRef(null);
+  const shouldAutoFitRef = useRef(true);
 
   const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
   const isDark = document.documentElement.classList.contains('dark');
-  const asset = `stock_${symbol.toLowerCase()}`;
+  const selectedView = useMemo(
+    () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
+    [viewId]
+  );
+
+  const asset = `stock_${selectedStock.symbol.toLowerCase()}`;
+
+  useEffect(() => {
+    shouldAutoFitRef.current = true;
+  }, [selectedStock, viewId]);
+
+  const loadCandles = useCallback(async () => {
+    setError('');
+    
+    if (!liveEngineUrl) {
+      setError('Live Engine URL is not configured. Please set VITE_LIVE_ENGINE_URL environment variable.');
+      return;
+    }
+    
+    try {
+      const response = await fetch(
+        `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`
+      );
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.detail || 'Failed to load candles');
+      }
+      
+      if (Array.isArray(payload)) {
+        const mappedCandles = payload.map(c => ({
+          timestamp: c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume || 0,
+        }));
+        setCandles(mappedCandles);
+      } else {
+        setCandles([]);
+      }
+    } catch (err) {
+      console.error('❌ Error loading candles:', err);
+      setError(err?.message || 'Unable to fetch candle history');
+    }
+  }, [liveEngineUrl, asset, selectedView]);
 
   const disconnectWebSocket = useCallback(() => {
     if (wsRef.current) {
@@ -62,10 +199,11 @@ const StockChart = ({ symbol, name }) => {
 
   const connectWebSocket = useCallback(() => {
     if (!liveEngineUrl) {
+      setError('Live Engine URL is not configured.');
       setWsStatus('error');
       return;
     }
-
+    
     disconnectWebSocket();
     const wsUrl = toWsUrl(liveEngineUrl, asset);
     setWsStatus('connecting');
@@ -81,33 +219,19 @@ const StockChart = ({ symbol, name }) => {
       try {
         const data = JSON.parse(event.data);
         
-        // Update market status if provided
+        // Update market status
         if (data.marketStatus) {
           setMarketStatus(data.marketStatus);
         }
         
         if (data.type === 'tick' && typeof data.price === 'number') {
-          const newPrice = data.price;
-          setPrice((prevPrice) => {
-            if (prevPrice !== null) {
-              setPriceChange(newPrice - prevPrice);
-            }
-            return newPrice;
-          });
+          const price = Number(data.price);
+          if (!Number.isFinite(price)) return;
+          setLatestPrice(price);
 
-          // Add to price history for chart
-          const timestamp = asUnixSeconds(data.timestamp || new Date().toISOString());
-          if (timestamp !== null) {
-            pricesRef.current.push({ time: timestamp, value: newPrice });
-            // Keep only last 100 points
-            if (pricesRef.current.length > 100) {
-              pricesRef.current.shift();
-            }
-
-            // Update chart
-            if (seriesRef.current) {
-              seriesRef.current.setData(pricesRef.current);
-            }
+          if (selectedView.id === '1s') {
+            const tickMs = parseBackendTimestamp(data.timestamp) ?? Date.now();
+            setCandles((prev) => appendTickToOneSecondCandles(prev, price, tickMs));
           }
         }
       } catch (err) {
@@ -122,147 +246,255 @@ const StockChart = ({ symbol, name }) => {
     ws.onclose = () => {
       setWsStatus('disconnected');
     };
-  }, [liveEngineUrl, asset, disconnectWebSocket]);
+  }, [liveEngineUrl, asset, selectedView, disconnectWebSocket]);
 
-  // Initialize chart
+  useEffect(() => {
+    if (!liveEngineUrl) {
+      disconnectWebSocket();
+      return;
+    }
+    loadCandles();
+    connectWebSocket();
+
+    return () => disconnectWebSocket();
+  }, [selectedStock, viewId, loadCandles, connectWebSocket, disconnectWebSocket, liveEngineUrl]);
+
+  const displayError = error;
+
   useEffect(() => {
     if (!chartContainerRef.current) return undefined;
 
-    const chart = createChart(chartContainerRef.current, {
-      autoSize: true,
-      layout: {
-        attributionLogo: false,
-        background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
-        textColor: isDark ? '#d4d4d8' : '#334155',
-      },
-      grid: {
-        vertLines: { visible: false },
-        horzLines: { color: isDark ? '#262626' : '#e2e8f0' },
-      },
-      crosshair: {
-        vertLine: { visible: false },
-        horzLine: { visible: false },
-      },
-      rightPriceScale: {
-        borderVisible: false,
-        scaleMargins: { top: 0.1, bottom: 0.1 },
-      },
-      timeScale: {
-        borderVisible: false,
-        visible: false,
-      },
-      handleScroll: false,
-      handleScale: false,
-    });
+    try {
+      const chart = createChart(chartContainerRef.current, {
+        autoSize: true,
+        localization: {
+          timeFormatter: (time) => formatLocalFromChartTime(time, selectedView.secondsVisible),
+        },
+        layout: {
+          attributionLogo: false,
+          background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' },
+          textColor: isDark ? '#d4d4d8' : '#334155',
+        },
+        grid: {
+          vertLines: { color: isDark ? '#262626' : '#e2e8f0' },
+          horzLines: { color: isDark ? '#262626' : '#e2e8f0' },
+        },
+        crosshair: {
+          vertLine: { color: isDark ? '#52525b' : '#94a3b8' },
+          horzLine: { color: isDark ? '#52525b' : '#94a3b8' },
+        },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false,
+        },
+        handleScale: {
+          axisPressedMouseMove: true,
+          mouseWheel: true,
+          pinch: true,
+        },
+        rightPriceScale: {
+          borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+          autoScale: true,
+          scaleMargins: { top: 0.08, bottom: 0.08 },
+        },
+        timeScale: {
+          borderColor: isDark ? '#3f3f46' : '#cbd5e1',
+          timeVisible: true,
+          secondsVisible: selectedView.secondsVisible,
+          tickMarkFormatter: (time) =>
+            formatLocalFromChartTime(time, selectedView.secondsVisible),
+          rightOffset: 2,
+          barSpacing: selectedView.id === '1s' ? 16 : 18,
+          minBarSpacing: selectedView.id === '1s' ? 10 : 12,
+        },
+      });
 
-    const areaOptions = {
-      lineColor: '#22c55e',
-      topColor: 'rgba(34, 197, 94, 0.3)',
-      bottomColor: 'rgba(34, 197, 94, 0.0)',
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    };
+      let mainSeries;
+      
+      if (selectedView.id === '1s') {
+        const areaOptions = {
+          lineColor: '#22c55e',
+          topColor: 'rgba(34, 197, 94, 0.4)',
+          bottomColor: 'rgba(34, 197, 94, 0.0)',
+          lineWidth: 2,
+          priceLineVisible: true,
+        };
+        mainSeries = typeof chart.addAreaSeries === 'function'
+          ? chart.addAreaSeries(areaOptions)
+          : chart.addSeries(AreaSeries, areaOptions);
+      } else {
+        const candleOptions = {
+          upColor: '#22c55e',
+          downColor: '#ef4444',
+          borderVisible: true,
+          borderUpColor: '#16a34a',
+          borderDownColor: '#dc2626',
+          wickUpColor: '#22c55e',
+          wickDownColor: '#ef4444',
+          priceLineVisible: true,
+        };
 
-    // Use fallback pattern for API compatibility (same as LiveChart.jsx)
-    const series = typeof chart.addAreaSeries === 'function'
-      ? chart.addAreaSeries(areaOptions)
-      : chart.addSeries(AreaSeries, areaOptions);
+        mainSeries = typeof chart.addCandlestickSeries === 'function'
+          ? chart.addCandlestickSeries(candleOptions)
+          : chart.addSeries(CandlestickSeries, candleOptions);
+      }
 
-    chartRef.current = chart;
-    seriesRef.current = series;
+      mainSeries.priceScale().applyOptions({
+        autoScale: true,
+        scaleMargins: { top: 0.08, bottom: 0.08 },
+      });
+
+      chartRef.current = chart;
+      candleSeriesRef.current = mainSeries;
+    } catch (chartError) {
+      console.error('Failed to initialize trading chart', chartError);
+    }
 
     return () => {
       if (chartRef.current) {
         chartRef.current.remove();
       }
       chartRef.current = null;
-      seriesRef.current = null;
+      candleSeriesRef.current = null;
     };
-  }, [isDark]);
+  }, [isDark, selectedView.id, selectedView.secondsVisible]);
 
-  // Connect WebSocket
   useEffect(() => {
-    connectWebSocket();
-    return () => disconnectWebSocket();
-  }, [connectWebSocket, disconnectWebSocket]);
+    if (!candleSeriesRef.current) return;
 
-  const statusColor = wsStatus === 'connected' ? 'bg-green-500' : 'bg-red-500';
-  const priceChangeColor = priceChange >= 0 ? 'text-green-500' : 'text-red-500';
-  const PriceIcon = priceChange >= 0 ? TrendingUp : TrendingDown;
+    const mapped = candles
+      .map((c) => {
+        const time = asUnixSeconds(c.timestamp);
+        if (time === null) return null;
+        if (
+          !isFiniteNumber(c.open) ||
+          !isFiniteNumber(c.high) ||
+          !isFiniteNumber(c.low) ||
+          !isFiniteNumber(c.close)
+        ) {
+          return null;
+        }
+
+        if (selectedView.id === '1s') {
+          return {
+            time,
+            value: Number(c.close),
+          };
+        }
+
+        return {
+          time,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.time - b.time);
+
+    const deduped = [];
+    for (const row of mapped) {
+      if (deduped.length && deduped[deduped.length - 1].time === row.time) {
+        deduped[deduped.length - 1] = row;
+      } else {
+        deduped.push(row);
+      }
+    }
+
+    try {
+      candleSeriesRef.current.setData(deduped);
+    } catch (updateError) {
+      console.error('Chart setData failed', updateError);
+      return;
+    }
+
+    if (deduped.length && chartRef.current && shouldAutoFitRef.current) {
+      const visibleBars = DEFAULT_VISIBLE_BARS[selectedView.id] ?? 60;
+      const from = Math.max(0, deduped.length - visibleBars);
+      const to = deduped.length + 1;
+      chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+      chartRef.current.timeScale().scrollToRealTime();
+      candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
+      shouldAutoFitRef.current = false;
+    }
+  }, [candles, selectedView.id]);
+
   const isMarketClosed = marketStatus === 'closed';
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{symbol}</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isMarketClosed && (
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-              Market Closed
-            </span>
-          )}
-          <div className={`h-2 w-2 rounded-full ${statusColor}`} />
-        </div>
-      </div>
-
-      <div className="mb-3">
-        {price !== null ? (
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
-              ${price.toFixed(2)}
-            </span>
-            {priceChange !== 0 && (
-              <span className={`flex items-center gap-1 text-sm font-medium ${priceChangeColor}`}>
-                <PriceIcon className="h-3 w-3" />
-                {Math.abs(priceChange).toFixed(2)}
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="text-2xl font-bold text-slate-400 dark:text-slate-600">--</div>
-        )}
-      </div>
-
-      <div className="h-24">
-        <div ref={chartContainerRef} className="h-full w-full" />
-      </div>
-    </div>
-  );
-};
-
-const StockCharts = () => {
-  const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
-
-  return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="flex items-center gap-3">
-          <Activity className="h-6 w-6 text-indigo-500" />
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900 dark:text-white">
               Stock Live Charts
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Real-time stock prices for simulation trading
+              Tiingo live feed routed through live-engine websocket.
             </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            {wsStatus === 'connected' ? (
+              <Wifi className="h-4 w-4 text-green-500" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-rose-500" />
+            )}
+            <span className="capitalize text-slate-600 dark:text-slate-300">{wsStatus}</span>
+            {isMarketClosed && (
+              <span className="ml-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                Market Closed
+              </span>
+            )}
+            <Activity className="ml-2 h-4 w-4 text-indigo-500" />
+            <span className="font-medium text-slate-900 dark:text-white">
+              {latestPrice ? `$${latestPrice.toFixed(2)}` : '-'}
+            </span>
           </div>
         </div>
 
-        {!liveEngineUrl && (
-          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-            Live Engine URL is not configured. Please set VITE_LIVE_ENGINE_URL environment variable.
-          </div>
-        )}
+        {/* Stock selector buttons */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {STOCK_LIST.map((stock) => (
+            <button
+              key={stock.symbol}
+              onClick={() => setSelectedStock(stock)}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                selectedStock.symbol === stock.symbol
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
+              }`}
+            >
+              {stock.symbol}
+            </button>
+          ))}
+        </div>
+
+        {/* Timeframe selector buttons */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {VIEW_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => setViewId(option.id)}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                viewId === option.id
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-neutral-800 dark:text-slate-300 dark:hover:bg-neutral-700'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {displayError ? <p className="mt-3 text-sm text-rose-500">{displayError}</p> : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {STOCK_LIST.map((stock) => (
-          <StockChart key={stock.symbol} symbol={stock.symbol} name={stock.name} />
-        ))}
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="h-[320px] sm:h-[420px]">
+          <div ref={chartContainerRef} className="h-full w-full" />
+        </div>
       </div>
     </div>
   );
