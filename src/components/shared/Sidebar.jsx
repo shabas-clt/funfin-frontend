@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   Radio, X, Coins, Tag, Gamepad2, Bell, UserRound, TrendingUp, LineChart,
-  Database, Key, MessageSquare, Share2, Trophy,
+  Database, Key, MessageSquare, Share2, Trophy, BarChart3, Activity, DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
@@ -27,6 +27,10 @@ const adminMenus = [
   { name: 'Memes', path: '/admin/memes', icon: MessageSquare },
   { name: 'Referrals', path: '/admin/referrals/config', icon: Share2 },
   { name: 'Leaderboards', path: '/admin/leaderboards', icon: Trophy },
+  { header: 'Simulation Trading' },
+  { name: 'Stock Charts', path: '/admin/simulation/stocks', icon: Activity },
+  { name: 'Trades Monitor', path: '/admin/simulation/trades', icon: BarChart3 },
+  { name: 'Statistics', path: '/admin/simulation/stats', icon: DollarSign },
   { header: 'Live Engine' },
   { name: 'Dashboard', path: '/admin/live-engine/dashboard', icon: Database },
   { name: 'Token Management', path: '/admin/live-engine/tokens', icon: Key },

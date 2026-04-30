@@ -30,6 +30,11 @@ import ReferralConfig from '../pages/admin/referrals/ReferralConfig';
 import ReferralAnalytics from '../pages/admin/referrals/ReferralAnalytics';
 import LeaderboardsPreview from '../pages/admin/leaderboards/LeaderboardsPreview';
 
+// Simulation Trading
+import StockCharts from '../pages/admin/simulation/StockCharts';
+import SimulationTrades from '../pages/admin/simulation/SimulationTrades';
+import SimulationStats from '../pages/admin/simulation/SimulationStats';
+
 const AppRoutes = () => {
   const location = useLocation();
 
@@ -66,6 +71,11 @@ const AppRoutes = () => {
             <Route path="referrals/config" element={<PageTransition><ReferralConfig /></PageTransition>} />
             <Route path="referrals/analytics" element={<PageTransition><ReferralAnalytics /></PageTransition>} />
             <Route path="leaderboards" element={<PageTransition><LeaderboardsPreview /></PageTransition>} />
+            
+            {/* Simulation Trading */}
+            <Route path="simulation/stocks" element={<PageTransition><StockCharts /></PageTransition>} />
+            <Route path="simulation/trades" element={<PageTransition><SimulationTrades /></PageTransition>} />
+            <Route path="simulation/stats" element={<PageTransition><SimulationStats /></PageTransition>} />
           </Route>
         </Route>
 
