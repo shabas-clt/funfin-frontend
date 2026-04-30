@@ -17,7 +17,7 @@ const SimulationStats = () => {
         simulationApi.getLeaderboard({ limit: 10 }),
       ]);
       setStats(statsData);
-      setLeaderboard(Array.isArray(leaderboardData) ? leaderboardData : []);
+      setLeaderboard(leaderboardData.leaderboard || []);
     } catch (err) {
       console.error('Error loading data:', err);
       setError(typeof err === 'string' ? err : 'Failed to load statistics');
@@ -29,11 +29,6 @@ const SimulationStats = () => {
   useEffect(() => {
     loadData();
   }, []);
-
-  const formatCurrency = (value) => {
-    if (value === null || value === undefined) return '0.00';
-    return value.toFixed(2);
-  };
 
   const formatNumber = (value) => {
     if (value === null || value === undefined) return '0';
@@ -91,91 +86,45 @@ const SimulationStats = () => {
       {stats && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            title="Total Trades"
-            value={formatNumber(stats.total_trades)}
+            title="Active Trades"
+            value={formatNumber(stats.totalActiveTrades)}
             icon={Activity}
             color="bg-blue-500"
-            subtitle={`${formatNumber(stats.open_trades)} open, ${formatNumber(stats.closed_trades)} closed`}
+            subtitle="Currently open positions"
           />
           <StatCard
             title="Active Users"
-            value={formatNumber(stats.active_users)}
+            value={formatNumber(stats.totalUsers)}
             icon={Users}
             color="bg-green-500"
-            subtitle="Users with open trades"
+            subtitle="Users trading"
           />
           <StatCard
             title="Total Volume"
-            value={formatCurrency(stats.total_volume)}
+            value={`${formatNumber(stats.totalVolume)} coins`}
             icon={DollarSign}
             color="bg-purple-500"
-            subtitle="FunCoins traded"
+            subtitle="FunCoins in open trades"
           />
           <StatCard
             title="Net P&L"
-            value={formatCurrency(stats.total_pnl)}
-            icon={stats.total_pnl >= 0 ? TrendingUp : TrendingDown}
-            color={stats.total_pnl >= 0 ? 'bg-emerald-500' : 'bg-red-500'}
+            value={`${stats.totalProfitLoss >= 0 ? '+' : ''}${formatNumber(stats.totalProfitLoss)} coins`}
+            icon={stats.totalProfitLoss >= 0 ? TrendingUp : TrendingDown}
+            color={stats.totalProfitLoss >= 0 ? 'bg-emerald-500' : 'bg-red-500'}
             subtitle="Total profit/loss"
           />
         </div>
       )}
 
-      {/* Stock Performance */}
-      {stats && stats.stock_stats && stats.stock_stats.length > 0 && (
+      {/* Most Traded Stock */}
+      {stats && stats.mostTradedStock && (
         <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
-            Stock Performance
+          <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">
+            Most Traded Stock
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-slate-200 dark:border-neutral-800">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Stock
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Total Trades
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Open Trades
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Volume
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Net P&L
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
-                {stats.stock_stats.map((stock) => {
-                  const pnl = stock.total_pnl || 0;
-                  const pnlColor = pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
-
-                  return (
-                    <tr key={stock.stock_symbol} className="hover:bg-slate-50 dark:hover:bg-neutral-900/50">
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-white">
-                        {stock.stock_symbol}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        {formatNumber(stock.total_trades)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-slate-600 dark:text-slate-400">
-                        {formatNumber(stock.open_trades)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        {formatCurrency(stock.total_volume)}
-                      </td>
-                      <td className={`px-4 py-3 text-right text-sm font-semibold ${pnlColor}`}>
-                        {formatCurrency(pnl)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+            {stats.mostTradedStock}
+          </p>
         </div>
       )}
 
@@ -195,7 +144,10 @@ const SimulationStats = () => {
                   Rank
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                  User ID
+                  Username
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  Country
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                   Total Trades
@@ -211,50 +163,52 @@ const SimulationStats = () => {
             <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan="6" className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                     Loading leaderboard...
                   </td>
                 </tr>
               ) : leaderboard.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan="6" className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                     No traders yet
                   </td>
                 </tr>
               ) : (
-                leaderboard.map((trader, index) => {
-                  const pnl = trader.total_pnl || 0;
+                leaderboard.map((trader) => {
+                  const pnl = trader.totalProfitLoss || 0;
                   const pnlColor = pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
-                  const winRate = trader.total_trades > 0 ? (trader.winning_trades / trader.total_trades) * 100 : 0;
 
                   return (
-                    <tr key={trader.user_id} className="hover:bg-slate-50 dark:hover:bg-neutral-900/50">
+                    <tr key={trader.userId} className="hover:bg-slate-50 dark:hover:bg-neutral-900/50">
                       <td className="px-4 py-3 text-sm">
                         <span
                           className={`inline-flex h-8 w-8 items-center justify-center rounded-full font-bold ${
-                            index === 0
+                            trader.rank === 1
                               ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              : index === 1
+                              : trader.rank === 2
                               ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                              : index === 2
+                              : trader.rank === 3
                               ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
                               : 'bg-slate-50 text-slate-600 dark:bg-neutral-900 dark:text-slate-400'
                           }`}
                         >
-                          {index + 1}
+                          {trader.rank}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono text-slate-900 dark:text-white">
-                        {trader.user_id?.substring(0, 12)}...
+                      <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">
+                        {trader.username}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+                        {trader.country}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        {formatNumber(trader.total_trades)}
+                        {formatNumber(trader.totalTrades)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        {winRate.toFixed(1)}%
+                        {trader.winRate.toFixed(1)}%
                       </td>
                       <td className={`px-4 py-3 text-right text-sm font-semibold ${pnlColor}`}>
-                        {formatCurrency(pnl)}
+                        {pnl >= 0 ? '+' : ''}{formatNumber(pnl)} coins
                       </td>
                     </tr>
                   );
