@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Cookies from 'js-cookie';
 import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { STOCK_LIST } from '../../../api/simulationApi';
 
 const VIEW_OPTIONS = [
-  { id: '1s', label: '1s', apiTimeframe: '1s', wsTimeframe: '1s', limit: 320, secondsVisible: true },
-  { id: '1m', label: '1m', apiTimeframe: '1m', wsTimeframe: '1m', limit: 300, secondsVisible: false },
-  { id: '5m', label: '5m', apiTimeframe: '5m', wsTimeframe: '5m', limit: 220, secondsVisible: false },
-  { id: '15m', label: '15m', apiTimeframe: '15m', wsTimeframe: '15m', limit: 180, secondsVisible: false },
+  { id: '1s', label: '1s', apiTimeframe: '1s', limit: 320, secondsVisible: true },
+  { id: '1m', label: '1m', apiTimeframe: '1m', limit: 300, secondsVisible: false },
+  { id: '5m', label: '5m', apiTimeframe: '5m', limit: 220, secondsVisible: false },
+  { id: '15m', label: '15m', apiTimeframe: '15m', limit: 180, secondsVisible: false },
 ];
+
+const AUTH_COOKIE_KEY = 'ff_admin_token';
 
 const DEFAULT_VISIBLE_BARS = {
   '1s': 80,
@@ -16,6 +19,20 @@ const DEFAULT_VISIBLE_BARS = {
   '5m': 80,
   '15m': 80,
 };
+
+function getClientApiBaseUrl() {
+  const configured = import.meta.env.VITE_CLIENT_API_URL;
+  if (configured) return configured.replace(/\/$/, '');
+
+  const adminApi = import.meta.env.VITE_API_URL || 'http://localhost:5002/api/v1';
+  if (adminApi.includes('admin-api.')) {
+    return adminApi.replace('admin-api.', 'api.');
+  }
+  if (adminApi.includes(':5002')) {
+    return adminApi.replace(':5002', ':5001');
+  }
+  return adminApi;
+}
 
 function getLiveEngineUrl() {
   const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
@@ -26,12 +43,12 @@ function getLiveEngineUrl() {
   return configured.replace(/\/$/, '');
 }
 
-function toWsUrl(liveEngineUrl, asset) {
-  const root = liveEngineUrl.replace(/\/api\/v1\/?$/, '');
+function toWsUrl(apiBase, token) {
+  const root = apiBase.replace(/\/api\/v1\/?$/, '');
   const wsRoot = root.startsWith('https://')
     ? root.replace('https://', 'wss://')
     : root.replace('http://', 'ws://');
-  return `${wsRoot}/api/ws/stream?asset=${asset}`;
+  return `${wsRoot}/api/v1/simulation/stream?token=${encodeURIComponent(token)}`;
 }
 
 function parseBackendTimestamp(value) {
@@ -127,7 +144,7 @@ function formatLocalFromChartTime(time, showSeconds = true) {
 }
 
 const StockCharts = () => {
-  const [selectedStock, setSelectedStock] = useState(STOCK_LIST[0]); // Default to first stock
+  const [selectedStock, setSelectedStock] = useState(STOCK_LIST[0]);
   const [viewId, setViewId] = useState('1s');
   const [candles, setCandles] = useState([]);
   const [latestPrice, setLatestPrice] = useState(null);
@@ -140,6 +157,7 @@ const StockCharts = () => {
   const candleSeriesRef = useRef(null);
   const shouldAutoFitRef = useRef(true);
 
+  const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
   const isDark = document.documentElement.classList.contains('dark');
   const selectedView = useMemo(
@@ -198,14 +216,15 @@ const StockCharts = () => {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!liveEngineUrl) {
-      setError('Live Engine URL is not configured.');
+    const authToken = Cookies.get(AUTH_COOKIE_KEY);
+    if (!authToken) {
+      setError('Admin auth token not found. Please log in again.');
       setWsStatus('error');
       return;
     }
     
     disconnectWebSocket();
-    const wsUrl = toWsUrl(liveEngineUrl, asset);
+    const wsUrl = toWsUrl(apiBase, authToken);
     setWsStatus('connecting');
 
     const ws = new WebSocket(wsUrl);
@@ -213,24 +232,40 @@ const StockCharts = () => {
 
     ws.onopen = () => {
       setWsStatus('connected');
+      ws.send(JSON.stringify({ 
+        type: 'subscribe', 
+        stock: selectedStock.symbol.toLowerCase()
+      }));
     };
 
     ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const message = JSON.parse(event.data);
         
-        // Update market status
-        if (data.marketStatus) {
-          setMarketStatus(data.marketStatus);
+        if (message.type === 'welcome') {
+          return;
         }
         
-        if (data.type === 'tick' && typeof data.price === 'number') {
-          const price = Number(data.price);
+        if (message.type === 'subscribed') {
+          return;
+        }
+        
+        if (message.type === 'error') {
+          setError(message.message || 'WebSocket error');
+          return;
+        }
+        
+        if (message.marketStatus) {
+          setMarketStatus(message.marketStatus);
+        }
+        
+        if (message.type === 'tick' && typeof message.price === 'number') {
+          const price = Number(message.price);
           if (!Number.isFinite(price)) return;
           setLatestPrice(price);
 
           if (selectedView.id === '1s') {
-            const tickMs = parseBackendTimestamp(data.timestamp) ?? Date.now();
+            const tickMs = parseBackendTimestamp(message.timestamp) ?? Date.now();
             setCandles((prev) => appendTickToOneSecondCandles(prev, price, tickMs));
           }
         }
@@ -246,20 +281,23 @@ const StockCharts = () => {
     ws.onclose = () => {
       setWsStatus('disconnected');
     };
-  }, [liveEngineUrl, asset, selectedView, disconnectWebSocket]);
+  }, [apiBase, selectedStock, selectedView, disconnectWebSocket]);
 
   useEffect(() => {
-    if (!liveEngineUrl) {
+    const authToken = Cookies.get(AUTH_COOKIE_KEY);
+    if (!authToken) {
       disconnectWebSocket();
       return;
     }
+    
     loadCandles();
     connectWebSocket();
 
     return () => disconnectWebSocket();
-  }, [selectedStock, viewId, loadCandles, connectWebSocket, disconnectWebSocket, liveEngineUrl]);
+  }, [selectedStock, viewId, loadCandles, connectWebSocket, disconnectWebSocket]);
 
-  const displayError = error;
+  const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
+  const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
 
   useEffect(() => {
     if (!chartContainerRef.current) return undefined;
@@ -433,7 +471,7 @@ const StockCharts = () => {
               Stock Live Charts
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Tiingo live feed routed through live-engine websocket.
+              Real-time stock prices routed through FastAPI backend.
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -455,7 +493,6 @@ const StockCharts = () => {
           </div>
         </div>
 
-        {/* Stock selector buttons */}
         <div className="mt-4 flex flex-wrap gap-2">
           {STOCK_LIST.map((stock) => (
             <button
@@ -472,7 +509,6 @@ const StockCharts = () => {
           ))}
         </div>
 
-        {/* Timeframe selector buttons */}
         <div className="mt-3 flex flex-wrap gap-2">
           {VIEW_OPTIONS.map((option) => (
             <button
