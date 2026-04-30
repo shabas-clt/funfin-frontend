@@ -7,8 +7,11 @@ const ALL_STOCKS = [...US_STOCK_LIST, ...INDIAN_STOCK_LIST, ...UK_STOCK_LIST];
 
 const SimulationTrades = () => {
   const [trades, setTrades] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
   const [filters, setFilters] = useState({
     status: '',
     stock: '',
@@ -21,8 +24,8 @@ const SimulationTrades = () => {
     setError('');
     try {
       const params = {
-        skip: 0,
-        limit: 100,
+        skip: (page - 1) * limit,
+        limit: limit,
       };
       if (filters.status) params.status = filters.status;
       if (filters.stock) params.stock = filters.stock;
@@ -30,6 +33,7 @@ const SimulationTrades = () => {
 
       const data = await simulationApi.getTrades(params);
       setTrades(data.trades || []);
+      setTotal(data.total || 0);
     } catch (err) {
       console.error('Error loading trades:', err);
       setError(typeof err === 'string' ? err : 'Failed to load trades');
@@ -40,7 +44,7 @@ const SimulationTrades = () => {
 
   useEffect(() => {
     loadTrades();
-  }, [filters]);
+  }, [filters, page]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -57,9 +61,12 @@ const SimulationTrades = () => {
   const clearFilters = () => {
     setFilters({ status: '', stock: '', user_id: '' });
     setSearchTerm('');
+    setPage(1);
   };
 
   const filteredTrades = trades;
+
+  const totalPages = Math.ceil(total / limit);
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -289,6 +296,61 @@ const SimulationTrades = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="border-t border-slate-200 px-4 py-3 dark:border-neutral-800">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total} trades
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:bg-neutral-800"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= page - 1 && pageNum <= page + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setPage(pageNum)}
+                          className={`rounded-lg px-3 py-1 text-sm font-medium ${
+                            page === pageNum
+                              ? 'bg-indigo-600 text-white'
+                              : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:bg-neutral-800'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (pageNum === page - 2 || pageNum === page + 2) {
+                      return <span key={pageNum} className="px-2 text-slate-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-neutral-700 dark:bg-neutral-900 dark:text-slate-300 dark:hover:bg-neutral-800"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
