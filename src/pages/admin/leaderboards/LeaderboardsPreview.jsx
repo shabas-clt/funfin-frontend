@@ -18,13 +18,31 @@ export default function LeaderboardsPreview() {
 
     try {
       // Note: These endpoints are on the client API but now accept both user and admin tokens
-      const [coinsData, winRateData] = await Promise.all([
+      const [coinsData, simulationData] = await Promise.all([
         clientApi.get('/leaderboard/all-time/coins', { params: { limit: 20 } }),
-        clientApi.get('/leaderboard/all-time/win-rate', { params: { limit: 20, minPredictions: 10 } })
+        clientApi.get('/simulation/leaderboard/global', { params: { limit: 20, week: 'current' } })
       ]);
       
       setCoinsLeaderboard({ ...coinsData, type: 'coins' });
-      setWinRateLeaderboard({ ...winRateData, type: 'win-rate' });
+      
+      // Transform simulation leaderboard to match expected format
+      const transformedSimulation = {
+        type: 'simulation',
+        range: 'current-week',
+        entries: simulationData.leaderboard.map(entry => ({
+          rank: entry.rank,
+          userId: entry.userId,
+          fullName: entry.username,
+          totalProfitLoss: entry.totalProfitLoss,
+          totalTrades: entry.totalTrades,
+          winRate: entry.winRate
+        })),
+        total: simulationData.total,
+        weekNumber: simulationData.weekNumber,
+        weekYear: simulationData.weekYear
+      };
+      
+      setWinRateLeaderboard(transformedSimulation);
     } catch (error) {
       const message = typeof error === 'string' ? error : 'Failed to load leaderboards';
       toast.error(message);
@@ -91,7 +109,7 @@ export default function LeaderboardsPreview() {
           />
           <LeaderboardTable 
             leaderboard={winRateLeaderboard} 
-            title="All-Time Win Rate" 
+            title="Simulation Trading Leaderboard (Current Week)" 
           />
         </div>
       )}
@@ -100,7 +118,7 @@ export default function LeaderboardsPreview() {
         <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 mb-2">Calculation Methods</h3>
         <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
           <p><strong>Coins Leaderboard:</strong> Total coins earned across all activities</p>
-          <p><strong>Win Rate Leaderboard:</strong> (Wins ÷ Total Predictions) × 100 (minimum 10 predictions required)</p>
+          <p><strong>Simulation Trading Leaderboard:</strong> Ranked by total profit/loss in the current week. Win rate = (Profitable trades ÷ Total trades) × 100</p>
         </div>
       </div>
     </div>

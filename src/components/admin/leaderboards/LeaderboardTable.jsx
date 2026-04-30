@@ -30,12 +30,18 @@ export default function LeaderboardTable({ leaderboard, title }) {
                 User
               </th>
               <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {leaderboard.type === 'coins' ? 'Total Coins' : 'Win Rate'}
+                {leaderboard.type === 'coins' ? 'Total Coins' : 
+                 leaderboard.type === 'simulation' ? 'Profit/Loss' : 'Win Rate'}
               </th>
-              {leaderboard.type === 'win-rate' && (
-                <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Predictions
-                </th>
+              {(leaderboard.type === 'win-rate' || leaderboard.type === 'simulation') && (
+                <>
+                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {leaderboard.type === 'simulation' ? 'Trades' : 'Predictions'}
+                  </th>
+                  <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Win Rate
+                  </th>
+                </>
               )}
             </tr>
           </thead>
@@ -66,14 +72,14 @@ export default function LeaderboardTable({ leaderboard, title }) {
                       ) : (
                         <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-neutral-700 flex items-center justify-center">
                           <span className="text-slate-600 dark:text-slate-300 font-medium text-sm">
-                            {entry.user?.fullName?.charAt(0) || '?'}
+                            {(entry.fullName || entry.user?.fullName)?.charAt(0) || '?'}
                           </span>
                         </div>
                       )}
                     </div>
                     <div>
                       <div className="font-semibold text-slate-900 dark:text-slate-100">
-                        {entry.user?.fullName || 'Unknown User'}
+                        {entry.fullName || entry.user?.fullName || 'Unknown User'}
                       </div>
                       <div className="text-[11px] text-slate-400 font-normal">
                         ID: {entry.userId}
@@ -85,14 +91,25 @@ export default function LeaderboardTable({ leaderboard, title }) {
                   <div className="font-medium text-slate-900 dark:text-white">
                     {leaderboard.type === 'coins' ? 
                       `${entry.totalCoins?.toLocaleString() || 0} coins` :
+                      leaderboard.type === 'simulation' ?
+                      <span className={entry.totalProfitLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                        {entry.totalProfitLoss >= 0 ? '+' : ''}{entry.totalProfitLoss?.toLocaleString() || 0} coins
+                      </span> :
                       `${(entry.winRate || 0).toFixed(1)}%`
                     }
                   </div>
                 </td>
-                {leaderboard.type === 'win-rate' && (
-                  <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
-                    {entry.totalPredictions || 0}
-                  </td>
+                {(leaderboard.type === 'win-rate' || leaderboard.type === 'simulation') && (
+                  <>
+                    <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
+                      {leaderboard.type === 'simulation' ? entry.totalTrades || 0 : entry.totalPredictions || 0}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="font-medium text-slate-900 dark:text-white">
+                        {(entry.winRate || 0).toFixed(1)}%
+                      </div>
+                    </td>
+                  </>
                 )}
               </tr>
             ))}
