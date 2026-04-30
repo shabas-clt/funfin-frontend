@@ -464,6 +464,22 @@ const StockCharts = () => {
 
   return (
     <div className="p-4 sm:p-6">
+      {isMarketClosed && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="font-medium text-amber-900 dark:text-amber-200">
+                US Stock Market is Currently Closed
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday. Live data will resume when market opens.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -482,7 +498,7 @@ const StockCharts = () => {
             )}
             <span className="capitalize text-slate-600 dark:text-slate-300">{wsStatus}</span>
             {isMarketClosed && (
-              <span className="ml-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 Market Closed
               </span>
             )}
