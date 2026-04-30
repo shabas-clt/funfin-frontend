@@ -300,9 +300,6 @@ const StockCharts = () => {
     return () => disconnectWebSocket();
   }, [selectedStock, viewId, selectedMarket, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket]);
 
-  const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
-  const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
-
   useEffect(() => {
     if (!chartContainerRef.current) return undefined;
 
