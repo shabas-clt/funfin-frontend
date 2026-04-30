@@ -198,7 +198,6 @@ const StockCharts = () => {
       // API returns { stocks: [...], total: 12, marketStatus: "closed", market: "US" }
       if (data.marketStatus) {
         setMarketStatus(data.marketStatus);
-        console.log(`✅ ${selectedMarket} Market Status:`, data.marketStatus);
       }
     } catch (err) {
       console.error('Failed to fetch market status:', err);
@@ -276,7 +275,6 @@ const StockCharts = () => {
         stock: selectedStock.symbol.toLowerCase(),
         timeframe: selectedView.wsTimeframe
       }));
-      console.log(`✅ Subscribed to ${selectedStock.symbol.toLowerCase()}:${selectedView.wsTimeframe}`);
     };
 
     ws.onmessage = (event) => {
@@ -285,13 +283,11 @@ const StockCharts = () => {
         
         // Handle welcome message
         if (message.type === 'welcome') {
-          console.log('📡 Connected to simulation stream');
           return;
         }
         
         // Handle subscribed confirmation
         if (message.type === 'subscribed') {
-          console.log(`✅ Subscribed confirmed for ${message.stock}:${message.timeframe}`);
           if (typeof message.price === 'number') {
             setLatestPrice(message.price);
           }
