@@ -176,10 +176,14 @@ const StockCharts = () => {
     
     try {
       const response = await fetch(`${liveEngineUrl}/api/stocks`);
-      const stocks = await response.json();
+      const data = await response.json();
       
-      if (Array.isArray(stocks) && stocks.length > 0) {
-        const status = stocks[0].marketStatus;
+      // API returns { stocks: [...], total: 12, marketStatus: "closed" }
+      if (data.marketStatus) {
+        setMarketStatus(data.marketStatus);
+      } else if (data.stocks && Array.isArray(data.stocks) && data.stocks.length > 0) {
+        // Fallback: get from first stock
+        const status = data.stocks[0].marketStatus;
         if (status) {
           setMarketStatus(status);
         }
