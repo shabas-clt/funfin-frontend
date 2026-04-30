@@ -151,6 +151,7 @@ const StockCharts = () => {
   const [wsStatus, setWsStatus] = useState('idle');
   const [marketStatus, setMarketStatus] = useState('unknown');
   const [error, setError] = useState('');
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
   const wsRef = useRef(null);
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -159,13 +160,26 @@ const StockCharts = () => {
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
-  const isDark = document.documentElement.classList.contains('dark');
   const selectedView = useMemo(
     () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
     [viewId]
   );
 
   const asset = `stock_${selectedStock.symbol.toLowerCase()}`;
+
+  // Listen for theme changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     shouldAutoFitRef.current = true;
