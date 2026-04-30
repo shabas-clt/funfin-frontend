@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Cookies from 'js-cookie';
 import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { US_STOCK_LIST, INDIAN_STOCK_LIST } from '../../../api/simulationApi';
@@ -11,28 +10,12 @@ const VIEW_OPTIONS = [
   { id: '15m', label: '15m', apiTimeframe: '15m', limit: 180, secondsVisible: false },
 ];
 
-const AUTH_COOKIE_KEY = 'ff_admin_token';
-
 const DEFAULT_VISIBLE_BARS = {
   '1s': 80,
   '1m': 80,
   '5m': 80,
   '15m': 80,
 };
-
-function getClientApiBaseUrl() {
-  const configured = import.meta.env.VITE_CLIENT_API_URL;
-  if (configured) return configured.replace(/\/$/, '');
-
-  const adminApi = import.meta.env.VITE_API_URL || 'http://localhost:5002/api/v1';
-  if (adminApi.includes('admin-api.')) {
-    return adminApi.replace('admin-api.', 'api.');
-  }
-  if (adminApi.includes(':5002')) {
-    return adminApi.replace(':5002', ':5001');
-  }
-  return adminApi;
-}
 
 function getLiveEngineUrl() {
   const configured = import.meta.env.VITE_LIVE_ENGINE_URL;
@@ -41,14 +24,6 @@ function getLiveEngineUrl() {
     return null;
   }
   return configured.replace(/\/$/, '');
-}
-
-function toWsUrl(apiBase, token) {
-  const root = apiBase.replace(/\/api\/v1\/?$/, '');
-  const wsRoot = root.startsWith('https://')
-    ? root.replace('https://', 'wss://')
-    : root.replace('http://', 'ws://');
-  return `${wsRoot}/api/v1/simulation/stream?token=${encodeURIComponent(token)}`;
 }
 
 function parseBackendTimestamp(value) {
@@ -159,7 +134,6 @@ const StockCharts = () => {
   const candleSeriesRef = useRef(null);
   const shouldAutoFitRef = useRef(true);
 
-  const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
   const selectedView = useMemo(
     () => VIEW_OPTIONS.find((item) => item.id === viewId) ?? VIEW_OPTIONS[0],
@@ -192,23 +166,20 @@ const StockCharts = () => {
     if (!liveEngineUrl) return;
     
     try {
-      const response = await fetch(`${liveEngineUrl}/api/stocks`);
+      // Fetch market-specific status based on selected market
+      const endpoint = selectedMarket === 'US' ? '/api/stocks/us' : '/api/stocks/indian';
+      const response = await fetch(`${liveEngineUrl}${endpoint}`);
       const data = await response.json();
       
-      // API returns { stocks: [...], total: 12, marketStatus: "closed" }
+      // API returns { stocks: [...], total: 12, marketStatus: "closed", market: "US" }
       if (data.marketStatus) {
         setMarketStatus(data.marketStatus);
-      } else if (data.stocks && Array.isArray(data.stocks) && data.stocks.length > 0) {
-        // Fallback: get from first stock
-        const status = data.stocks[0].marketStatus;
-        if (status) {
-          setMarketStatus(status);
-        }
+        console.log(`✅ ${selectedMarket} Market Status:`, data.marketStatus);
       }
     } catch (err) {
       console.error('Failed to fetch market status:', err);
     }
-  }, [liveEngineUrl]);
+  }, [liveEngineUrl, selectedMarket]);
 
   const loadCandles = useCallback(async () => {
     setError('');
@@ -255,52 +226,49 @@ const StockCharts = () => {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    const authToken = Cookies.get(AUTH_COOKIE_KEY);
-    if (!authToken) {
-      setError('Admin auth token not found. Please log in again.');
+    if (!liveEngineUrl) {
+      setError('Live Engine URL is not configured.');
       setWsStatus('error');
       return;
     }
     
     disconnectWebSocket();
-    const wsUrl = toWsUrl(apiBase, authToken);
+    
+    // Connect directly to Live-Engine WebSocket with asset in URL
+    const wsRoot = liveEngineUrl.startsWith('https://')
+      ? liveEngineUrl.replace('https://', 'wss://')
+      : liveEngineUrl.replace('http://', 'ws://');
+    const wsUrl = `${wsRoot}/api/ws/stream?asset=${asset}`;
+    
+    console.log(`🔌 Connecting to Live-Engine WebSocket: ${wsUrl}`);
     setWsStatus('connecting');
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log(`✅ WebSocket connected to ${asset}`);
       setWsStatus('connected');
-      ws.send(JSON.stringify({ 
-        type: 'subscribe', 
-        stock: selectedStock.symbol.toLowerCase()
-      }));
+      // No subscription message needed - asset is in URL parameter
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         
-        if (message.type === 'welcome') {
+        // Handle error messages
+        if (message.error) {
+          console.error('❌ WebSocket error:', message.error);
+          setError(message.error);
           return;
         }
         
-        if (message.type === 'subscribed') {
-          return;
-        }
-        
-        if (message.type === 'error') {
-          setError(message.message || 'WebSocket error');
-          return;
-        }
-        
-        if (message.marketStatus) {
-          setMarketStatus(message.marketStatus);
-        }
-        
+        // Live-Engine sends: { type: "tick", asset: "stock_aapl", price: 150.25, timestamp: "..." }
         if (message.type === 'tick' && typeof message.price === 'number') {
           const price = Number(message.price);
           if (!Number.isFinite(price)) return;
+          
+          console.log(`📊 Received tick for ${message.asset}: $${price}`);
           setLatestPrice(price);
 
           if (selectedView.id === '1s') {
@@ -313,28 +281,24 @@ const StockCharts = () => {
       }
     };
 
-    ws.onerror = () => {
+    ws.onerror = (error) => {
+      console.error('❌ WebSocket error:', error);
       setWsStatus('error');
     };
 
     ws.onclose = () => {
+      console.log(`🔌 WebSocket disconnected from ${asset}`);
       setWsStatus('disconnected');
     };
-  }, [apiBase, selectedStock, selectedView, disconnectWebSocket]);
+  }, [liveEngineUrl, asset, selectedView, disconnectWebSocket]);
 
   useEffect(() => {
-    const authToken = Cookies.get(AUTH_COOKIE_KEY);
-    if (!authToken) {
-      disconnectWebSocket();
-      return;
-    }
-    
     loadMarketStatus();
     loadCandles();
     connectWebSocket();
 
     return () => disconnectWebSocket();
-  }, [selectedStock, viewId, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket]);
+  }, [selectedStock, viewId, selectedMarket, loadMarketStatus, loadCandles, connectWebSocket, disconnectWebSocket]);
 
   const authMissing = !Cookies.get(AUTH_COOKIE_KEY);
   const displayError = authMissing ? 'Admin auth token not found. Please log in again.' : error;
@@ -612,7 +576,7 @@ const StockCharts = () => {
             </button>
           ))}
         </div>
-        {displayError ? <p className="mt-3 text-sm text-rose-500">{displayError}</p> : null}
+        {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
