@@ -28,6 +28,7 @@ import PostingCategories from '../pages/admin/memes/PostingCategories';
 import ContentCategories from '../pages/admin/memes/ContentCategories';
 import ReferralConfig from '../pages/admin/referrals/ReferralConfig';
 import ReferralAnalytics from '../pages/admin/referrals/ReferralAnalytics';
+import ReferralRecords from '../pages/admin/referrals/ReferralRecords';
 import LeaderboardsPreview from '../pages/admin/leaderboards/LeaderboardsPreview';
 
 // Simulation Trading
@@ -70,6 +71,7 @@ const AppRoutes = () => {
             <Route path="memes/content-categories" element={<PageTransition><ContentCategories /></PageTransition>} />
             <Route path="referrals/config" element={<PageTransition><ReferralConfig /></PageTransition>} />
             <Route path="referrals/analytics" element={<PageTransition><ReferralAnalytics /></PageTransition>} />
+            <Route path="referrals/records" element={<PageTransition><ReferralRecords /></PageTransition>} />
             <Route path="leaderboards" element={<PageTransition><LeaderboardsPreview /></PageTransition>} />
             
             {/* Simulation Trading */}
