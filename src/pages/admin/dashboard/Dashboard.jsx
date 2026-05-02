@@ -12,6 +12,7 @@ import {
 import { Line, Bar } from 'react-chartjs-2';
 import { api } from '@/api/axios';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 import { toast } from 'react-toastify';
 import { PaymentInstrument } from '@/components/shared/PaymentInstrument';
 import {
@@ -49,6 +50,7 @@ const StatCardSkeleton = () => (
 
 export default function Dashboard() {
   const { theme } = useTheme();
+  const { admin } = useAuth();
   const isDark = theme === 'dark';
 
   const [windowDays, setWindowDays] = useState(30);
@@ -270,7 +272,9 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Welcome back, {tx.userName}!</h1>
+          <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">
+            Welcome back, <span className="text-indigo-600 dark:text-indigo-400 font-bold">{admin?.name || 'Admin'}</span>!
+          </h1>
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Live view of the FunFin platform</p>
         </div>
         <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-1">
