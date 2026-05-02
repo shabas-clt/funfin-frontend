@@ -273,7 +273,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">
-            Welcome back, <span className="text-indigo-600 dark:text-indigo-400 font-bold">{admin?.name || 'Admin'}</span>!
+            Welcome back, <span className="text-indigo-600 dark:text-indigo-400 font-bold">{admin?.fullName || 'Admin'}</span>!
           </h1>
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">Live view of the FunFin platform</p>
         </div>
