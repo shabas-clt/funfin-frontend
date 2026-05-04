@@ -1,0 +1,32 @@
+# Example: serve Vite admin static files at https://admin.funfin.io
+# Copy to /etc/nginx/sites-available/admin.funfin.io, adjust root, then:
+#   sudo ln -sf /etc/nginx/sites-available/admin.funfin.io /etc/nginx/sites-enabled/
+#   sudo certbot certonly --nginx -d admin.funfin.io   # or your existing cert workflow
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# SPA: React Router needs try_files so deep links work.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name admin.funfin.io;
+
+    root /var/www/admin.funfin.io;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    # Optional: long cache for hashed assets (Vite emits /assets/*)
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}
+
+# After TLS certificates exist, add a second server block for 443 ssl + same root,
+# or extend this file with listen 443 ssl; ssl_certificate ...; ssl_certificate_key ...;

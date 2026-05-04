@@ -1,0 +1,87 @@
+name: Deploy admin frontend to VPS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-admin-frontend
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_CLIENT_API_URL: ${{ secrets.VITE_CLIENT_API_URL }}
+          VITE_LIVE_ENGINE_URL: ${{ secrets.VITE_LIVE_ENGINE_URL }}
+
+  build-and-deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install and build
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_CLIENT_API_URL: ${{ secrets.VITE_CLIENT_API_URL }}
+          VITE_LIVE_ENGINE_URL: ${{ secrets.VITE_LIVE_ENGINE_URL }}
+
+      - name: Rsync dist to VPS
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          REMOTE_PATH: ${{ secrets.VPS_ADMIN_STATIC_PATH }}
+        run: |
+          set -euo pipefail
+          for v in SSH_PRIVATE_KEY VPS_HOST VPS_USER REMOTE_PATH; do
+            eval "x=\${$v:-}"
+            if [ -z "$x" ]; then
+              echo "Missing required secret: $v" >&2
+              exit 1
+            fi
+          done
+          mkdir -p ~/.ssh
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+            ./dist/ "${VPS_USER}@${VPS_HOST}:${REMOTE_PATH}/"
