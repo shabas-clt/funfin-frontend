@@ -20,9 +20,11 @@ export const weeklyChallengeSchema = yup.object({
  */
 export const specialChallengeSchema = yup.object({
   startDate: yup.date()
+    .transform((value, originalValue) => (originalValue === '' ? null : value))
     .required('Start date is required')
     .typeError('Must be a valid date'),
   endDate: yup.date()
+    .transform((value, originalValue) => (originalValue === '' ? null : value))
     .required('End date is required')
     .typeError('Must be a valid date')
     .min(yup.ref('startDate'), 'End date must be after start date')
@@ -34,5 +36,6 @@ export const specialChallengeSchema = yup.object({
 export const dailyChallengeSchema = yup.object({
   challengeDate: yup.date()
     .nullable()
+    .transform((value, originalValue) => (originalValue === '' ? null : value))
     .typeError('Must be a valid date')
 });
