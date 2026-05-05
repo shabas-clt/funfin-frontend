@@ -101,8 +101,19 @@ function ChallengeEditor({ initial, busy, onSave, onCancel }) {
       explanation: explanation.trim() || null,
       rewardCoins: Number(rewardCoins) || 0,
       isActive,
-      ...typeSpecificFields
     };
+
+    if (challengeType === 'daily') {
+      if (typeSpecificFields.challengeDate) {
+        payload.challengeDate = typeSpecificFields.challengeDate;
+      }
+    } else if (challengeType === 'weekly') {
+      payload.weekNumber = Number(typeSpecificFields.weekNumber);
+      payload.weekYear = Number(typeSpecificFields.weekYear);
+    } else if (challengeType === 'special') {
+      payload.startDate = typeSpecificFields.startDate;
+      payload.endDate = typeSpecificFields.endDate;
+    }
 
     onSave(payload);
   };
