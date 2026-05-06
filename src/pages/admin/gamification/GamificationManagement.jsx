@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Gamepad2, Target, HelpCircle, Award, Crown } from 'lucide-react';
+import { Gamepad2, Target, HelpCircle, Award, Crown, Zap } from 'lucide-react';
 import SpinConfigTab from './tabs/SpinConfigTab';
 import MissionsTab from './tabs/MissionsTab';
 import ChallengesTab from './tabs/ChallengesTab';
 import BadgesTab from './tabs/BadgesTab';
 import TitlesTab from './tabs/TitlesTab';
+import AchievementRulesTab from './tabs/AchievementRulesTab';
 
 const TABS = [
   { id: 'spin', label: 'Daily spin', icon: Gamepad2 },
@@ -12,6 +13,7 @@ const TABS = [
   { id: 'challenges', label: 'Daily challenges', icon: HelpCircle },
   { id: 'badges', label: 'Badges', icon: Award },
   { id: 'titles', label: 'Titles', icon: Crown },
+  { id: 'rules', label: 'Achievement rules', icon: Zap },
 ];
 
 export default function GamificationManagement() {
@@ -61,6 +63,7 @@ export default function GamificationManagement() {
         {tab === 'challenges' && <ChallengesTab />}
         {tab === 'badges' && <BadgesTab />}
         {tab === 'titles' && <TitlesTab />}
+        {tab === 'rules' && <AchievementRulesTab />}
       </div>
     </div>
   );
