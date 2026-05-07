@@ -1,0 +1,17 @@
+{
+  "name": "FunFin",
+  "short_name": "FunFin",
+  "description": "Learn Finance Through Gaming",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "1536x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#10b981",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/"
+}
