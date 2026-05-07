@@ -4,8 +4,13 @@
   "description": "Learn Finance Through Gaming",
   "icons": [
     {
-      "src": "/logo.png",
-      "sizes": "1536x1024",
+      "src": "/favicon.png",
+      "sizes": "420x147",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "420x147",
       "type": "image/png",
       "purpose": "any maskable"
     }
