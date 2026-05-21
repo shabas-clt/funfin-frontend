@@ -15,6 +15,22 @@ export function formatInr(value) {
   return inrFormatter.format(n);
 }
 
+// USD canonical formatter. Used during INR->USD migration: prices are
+// stored as USD canonical on the backend; this is the primary display
+// for course prices, funcoin rates, and signal subscriptions.
+const usdFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatUsd(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return usdFormatter.format(n);
+}
+
 const numberFormatter = new Intl.NumberFormat('en-IN');
 
 export function formatNumber(value) {

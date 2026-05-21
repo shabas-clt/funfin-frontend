@@ -16,7 +16,7 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import FieldError from '@/components/shared/FieldError';
 import { couponCreateSchema, couponUpdateSchema } from '@/lib/validation/schemas';
-import { formatInr, formatShortDate } from '@/lib/format';
+import { formatInr, formatUsd, formatShortDate } from '@/lib/format';
 
 const PAGE_SIZE = 20;
 
@@ -42,14 +42,20 @@ function normalizeDate(s) {
 }
 
 function DiscountSummary({ row }) {
-  const { discountType, discountValue, maxDiscountInr } = row;
+  const { discountType, discountValue, maxDiscountInr, maxDiscountUsd } = row;
   if (discountType === 'percent') {
+    const cap =
+      maxDiscountUsd != null
+        ? formatUsd(maxDiscountUsd)
+        : maxDiscountInr != null
+        ? formatInr(maxDiscountInr)
+        : null;
     return (
       <span>
         {discountValue}%{' '}
-        {maxDiscountInr != null && (
+        {cap && (
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            (up to {formatInr(maxDiscountInr)})
+            (up to {cap})
           </span>
         )}
       </span>
@@ -75,7 +81,9 @@ function CreateForm({ onCreated }) {
       discountType: 'percent',
       discountValue: '',
       maxDiscountInr: '',
+      maxDiscountUsd: '',
       minOrderAmountInr: 0,
+      minOrderAmountUsd: '',
       perUserLimit: 1,
       usageLimit: '',
       applicableCourseIdsText: '',
@@ -102,6 +110,12 @@ function CreateForm({ onCreated }) {
       if (values.description?.trim()) payload.description = values.description.trim();
       if (values.maxDiscountInr !== '' && values.maxDiscountInr != null) {
         payload.maxDiscountInr = Number(values.maxDiscountInr);
+      }
+      if (values.maxDiscountUsd !== '' && values.maxDiscountUsd != null) {
+        payload.maxDiscountUsd = Number(values.maxDiscountUsd);
+      }
+      if (values.minOrderAmountUsd !== '' && values.minOrderAmountUsd != null) {
+        payload.minOrderAmountUsd = Number(values.minOrderAmountUsd);
       }
       if (values.usageLimit !== '' && values.usageLimit != null) {
         payload.usageLimit = Number(values.usageLimit);
@@ -217,7 +231,19 @@ function CreateForm({ onCreated }) {
               </summary>
               <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 border-t border-slate-200 dark:border-neutral-700">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Max discount (percent only)</label>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Max discount USD (percent only)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register('maxDiscountUsd')}
+                    placeholder="Optional USD cap"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                    disabled={discountType !== 'percent'}
+                  />
+                  <FieldError error={errors.maxDiscountUsd} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Max discount INR (derived if blank)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -229,12 +255,22 @@ function CreateForm({ onCreated }) {
                   <FieldError error={errors.maxDiscountInr} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Minimum order amount</label>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Min order amount USD</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register('minOrderAmountUsd')}
+                    placeholder="Optional USD floor"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Min order amount INR (derived if blank)</label>
                   <input
                     type="number"
                     step="0.01"
                     {...register('minOrderAmountInr', { valueAsNumber: true })}
-                    placeholder="Optional floor amount"
+                    placeholder="Optional INR floor"
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
                   />
                 </div>
@@ -298,7 +334,9 @@ function EditDialog({ coupon, onSaved, onCancel }) {
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
       maxDiscountInr: coupon.maxDiscountInr ?? '',
+      maxDiscountUsd: coupon.maxDiscountUsd ?? '',
       minOrderAmountInr: coupon.minOrderAmountInr ?? 0,
+      minOrderAmountUsd: coupon.minOrderAmountUsd ?? '',
       perUserLimit: coupon.perUserLimit ?? 1,
       usageLimit: coupon.usageLimit ?? '',
       applicableCourseIdsText: idsToText(coupon.applicableCourseIds),
@@ -321,9 +359,15 @@ function EditDialog({ coupon, onSaved, onCancel }) {
       const prevMax = coupon.maxDiscountInr ?? null;
       const nextMax = values.maxDiscountInr === '' || values.maxDiscountInr == null ? null : Number(values.maxDiscountInr);
       if (prevMax !== nextMax) diff.maxDiscountInr = nextMax;
+      const prevMaxUsd = coupon.maxDiscountUsd ?? null;
+      const nextMaxUsd = values.maxDiscountUsd === '' || values.maxDiscountUsd == null ? null : Number(values.maxDiscountUsd);
+      if (prevMaxUsd !== nextMaxUsd) diff.maxDiscountUsd = nextMaxUsd;
       if (Number(values.minOrderAmountInr) !== (coupon.minOrderAmountInr ?? 0)) {
         diff.minOrderAmountInr = Number(values.minOrderAmountInr);
       }
+      const prevMinUsd = coupon.minOrderAmountUsd ?? null;
+      const nextMinUsd = values.minOrderAmountUsd === '' || values.minOrderAmountUsd == null ? null : Number(values.minOrderAmountUsd);
+      if (prevMinUsd !== nextMinUsd) diff.minOrderAmountUsd = nextMinUsd;
       if (Number(values.perUserLimit) !== (coupon.perUserLimit ?? 1)) {
         diff.perUserLimit = Number(values.perUserLimit);
       }
@@ -409,12 +453,31 @@ function EditDialog({ coupon, onSaved, onCancel }) {
             <FieldError error={errors.discountValue} />
           </div>
           <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Max discount (USD)</label>
+            <input
+              type="number"
+              step="0.01"
+              {...register('maxDiscountUsd')}
+              disabled={discountType !== 'percent'}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+            />
+          </div>
+          <div>
             <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Max discount (INR)</label>
             <input
               type="number"
               step="0.01"
               {...register('maxDiscountInr')}
               disabled={discountType !== 'percent'}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Min order (USD)</label>
+            <input
+              type="number"
+              step="0.01"
+              {...register('minOrderAmountUsd')}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
             />
           </div>

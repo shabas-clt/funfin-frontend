@@ -8,7 +8,7 @@ import { FilterDropdown } from '@/components/ui/filter-dropdown';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
-import { formatShortDate, formatInr } from '@/lib/format';
+import { formatShortDate, formatInr, formatUsd } from '@/lib/format';
 
 const FILTER_OPTIONS = ['All', 'published', 'draft'];
 const PAGE_SIZE = 12;
@@ -159,7 +159,7 @@ export default function CourseList() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{course.title}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {formatInr(course.priceInr)} · {course.moduleCount ?? course.totalModules ?? 0} mods · {course.videoCount ?? 0} videos
+                      {course.priceUsd != null ? formatUsd(course.priceUsd) : formatInr(course.priceInr)} · {course.moduleCount ?? course.totalModules ?? 0} mods · {course.videoCount ?? 0} videos
                     </p>
                     <div className="flex items-center justify-between mt-2">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${stateBadgeClass(state)}`}>{state}</span>
@@ -218,7 +218,10 @@ export default function CourseList() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 hidden lg:table-cell">{formatShortDate(course.createdAt)}</td>
-                      <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">{formatInr(course.priceInr)}</td>
+                      <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">
+                        {course.priceUsd != null ? formatUsd(course.priceUsd) : '—'}
+                        <span className="block text-[11px] font-normal text-slate-400">{formatInr(course.priceInr)}</span>
+                      </td>
                       <td className="px-5 py-3.5">
                         {course.moduleCount ?? course.totalModules ?? 0} mods · {course.videoCount ?? 0} videos
                       </td>
