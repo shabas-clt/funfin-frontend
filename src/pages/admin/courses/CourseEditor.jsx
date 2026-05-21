@@ -15,7 +15,7 @@ import FieldError from '@/components/shared/FieldError';
 import SyllabusEditor from './SyllabusEditor';
 import { courseCreateSchema, courseUpdateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
-import { formatInr } from '@/lib/format';
+import { formatInr, formatUsd } from '@/lib/format';
 import { deleteObject } from '@/api/media';
 
 const LEVELS = [
@@ -27,6 +27,7 @@ const LEVELS = [
 const CREATE_DEFAULTS = {
   title: '',
   description: '',
+  priceUsd: 0,
   priceInr: 0,
   photo: '',
   videoUrl: '',
@@ -35,16 +36,17 @@ const CREATE_DEFAULTS = {
   tags: [],
 };
 
-// The funcoin price is derived at purchase time from the live rate, but we
-// surface a *live preview* here so the admin knows roughly what students
-// will pay in funcoins today. This avoids the previous UI trap where the
-// admin had to enter `priceFuncoins` manually and get it wrong.
-function FuncoinPreview({ priceInr, rate }) {
+// Live funcoin/INR preview from the canonical USD price. Admins enter
+// price in USD; this estimates the on-purchase funcoin count and the
+// INR display value so the editor surfaces every currency the buyer
+// might see. `rate` is INR-per-coin from /funcoin/price.
+function FuncoinPreview({ priceUsd, priceInr, rate }) {
   if (!rate || !priceInr || priceInr <= 0) return null;
   const estimate = Math.round(priceInr / rate);
   return (
     <p className="mt-1 text-xs text-indigo-500 dark:text-indigo-400">
-      ≈ {estimate.toLocaleString('en-IN')} FunCoins at today&apos;s rate ({formatInr(rate)} / coin)
+      {priceUsd > 0 ? `${formatUsd(priceUsd)} ≈ ` : ''}
+      {formatInr(priceInr)} ≈ {estimate.toLocaleString('en-IN')} FunCoins at today&apos;s rate ({formatInr(rate)} / coin)
     </p>
   );
 }
@@ -79,6 +81,7 @@ export default function CourseEditor() {
   const photo = watch('photo');
   const videoUrl = watch('videoUrl');
   const priceInr = watch('priceInr');
+  const priceUsd = watch('priceUsd');
 
   useEffect(() => {
     (async () => {
@@ -102,6 +105,7 @@ export default function CourseEditor() {
         reset({
           title: data.title || '',
           description: data.description || '',
+          priceUsd: data.priceUsd || 0,
           priceInr: data.priceInr || 0,
           photo: data.photo || '',
           videoUrl: data.videoUrl || '',
@@ -136,7 +140,7 @@ export default function CourseEditor() {
         // Only send fields that actually changed so optional backend
         // fields don't get clobbered with no-ops.
         const diff = {};
-        const keys = ['title', 'description', 'priceInr', 'photo', 'videoUrl', 'level', 'language'];
+        const keys = ['title', 'description', 'priceUsd', 'priceInr', 'photo', 'videoUrl', 'level', 'language'];
         const norm = (v) => (v === '' || v === undefined ? null : v);
         for (const k of keys) {
           if (norm(course?.[k]) !== norm(payload[k])) {
@@ -307,18 +311,32 @@ export default function CourseEditor() {
         <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
           <CardContent className="p-4 sm:p-6 space-y-4">
             <h2 className="text-[15px] font-bold text-slate-900 dark:text-white">Pricing</h2>
-            <div className="max-w-sm">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (INR)</label>
-              <Input
-                type="number"
-                step="1"
-                min="0"
-                {...register('priceInr', { valueAsNumber: true })}
-                className="mt-1"
-              />
-              <FieldError error={errors.priceInr} />
-              <FuncoinPreview priceInr={Number(priceInr) || 0} rate={rate} />
+            <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (USD) — canonical</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register('priceUsd', { valueAsNumber: true })}
+                  className="mt-1"
+                />
+                <FieldError error={errors.priceUsd} />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Price (INR) — derived</label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  {...register('priceInr', { valueAsNumber: true })}
+                  className="mt-1"
+                />
+                <FieldError error={errors.priceInr} />
+                <p className="mt-1 text-xs text-slate-400">Optional — backend derives from USD if blank.</p>
+              </div>
             </div>
+            <FuncoinPreview priceUsd={Number(priceUsd) || 0} priceInr={Number(priceInr) || 0} rate={rate} />
           </CardContent>
         </Card>
 

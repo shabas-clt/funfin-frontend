@@ -3,7 +3,7 @@ import { Loader2, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
-import { formatInr, formatNumber, formatShortDateTime } from '@/lib/format';
+import { formatInr, formatUsd, formatNumber, formatShortDateTime } from '@/lib/format';
 import PaymentInstrument from '@/components/shared/PaymentInstrument';
 
 const PAGE_SIZE = 20;
@@ -187,7 +187,10 @@ export default function PurchasesTab() {
                           {formatNumber(row.coins)}
                         </td>
                         <td className="px-4 py-2.5 text-right font-semibold text-slate-900 dark:text-white">
-                          {formatInr(row.amountInr)}
+                          {row.amountUsd != null ? formatUsd(row.amountUsd) : '—'}
+                          <span className="block text-[11px] font-normal text-slate-400">
+                            {formatInr(row.amountInr)}
+                          </span>
                         </td>
                         <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 text-xs">
                           {row.rateAtPurchase != null ? formatInr(row.rateAtPurchase) : '—'}

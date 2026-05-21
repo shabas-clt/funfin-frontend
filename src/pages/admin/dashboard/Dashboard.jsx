@@ -17,6 +17,7 @@ import { toast } from 'react-toastify';
 import { PaymentInstrument } from '@/components/shared/PaymentInstrument';
 import {
   formatInr,
+  formatUsd,
   formatNumber,
   formatShortDateTime,
   formatChartDay,
@@ -125,7 +126,11 @@ export default function Dashboard() {
   const summaryCards = useMemo(() => {
     const users = summary?.users || { total: 0, newInWindow: 0 };
     const courses = summary?.courses || { published: 0, draft: 0, total: 0 };
-    const rev = summary?.revenueInr || { total: 0, course: 0, funcoin: 0, signal: 0 };
+    const revInr = summary?.revenueInr || { total: 0, course: 0, funcoin: 0, signal: 0 };
+    const revUsd = summary?.revenueUsd || null;
+    // Prefer USD aggregates when backend supplies them; fall back to INR.
+    const rev = revUsd && (revUsd.total ?? 0) > 0 ? revUsd : revInr;
+    const revIsUsd = rev === revUsd;
 
     return [
       {
@@ -157,8 +162,10 @@ export default function Dashboard() {
       },
       {
         title: 'Revenue',
-        value: formatInr(rev.total),
-        hint: `Courses ${formatInr(rev.course)} • FC ${formatInr(rev.funcoin)} • Signals ${formatInr(rev.signal)}`,
+        value: revIsUsd ? formatUsd(rev.total) : formatInr(rev.total),
+        hint: revIsUsd
+          ? `Courses ${formatUsd(rev.course)} • FC ${formatUsd(rev.funcoin)} • Signals ${formatUsd(rev.signal)}`
+          : `Courses ${formatInr(rev.course)} • FC ${formatInr(rev.funcoin)} • Signals ${formatInr(rev.signal)}`,
         icon: IndianRupee,
         bg: 'bg-amber-100 dark:bg-amber-900/40',
         color: 'text-amber-500',
@@ -169,26 +176,30 @@ export default function Dashboard() {
 
   const revenueChartData = useMemo(() => {
     const points = timeseries?.points || [];
+    // Prefer USD per-day series when backend provides it.
+    const hasUsd = points.some((p) => (p.totalRevenueUsd ?? 0) > 0);
+    const key = (base) => (hasUsd ? `${base}Usd` : `${base}Inr`);
     return {
       labels: points.map((p) => formatChartDay(p.date)),
+      _isUsd: hasUsd,
       datasets: [
         {
           label: 'Courses',
-          data: points.map((p) => p.courseRevenueInr),
+          data: points.map((p) => p[key('courseRevenue')] ?? 0),
           backgroundColor: chartPalette.courseBar,
           borderRadius: 4,
           barPercentage: 0.6,
         },
         {
           label: 'FunCoins',
-          data: points.map((p) => p.funcoinRevenueInr),
+          data: points.map((p) => p[key('funcoinRevenue')] ?? 0),
           backgroundColor: chartPalette.funcoinBar,
           borderRadius: 4,
           barPercentage: 0.6,
         },
         {
           label: 'Signals',
-          data: points.map((p) => p.signalRevenueInr),
+          data: points.map((p) => p[key('signalRevenue')] ?? 0),
           backgroundColor: chartPalette.signalBar,
           borderRadius: 4,
           barPercentage: 0.6,
@@ -209,7 +220,7 @@ export default function Dashboard() {
         grid: { borderDash: [4, 4], color: chartPalette.grid },
         ticks: {
           color: chartPalette.ticks,
-          callback: (v) => `₹${formatNumber(v)}`,
+          callback: (v) => (revenueChartData._isUsd ? `$${formatNumber(v)}` : `₹${formatNumber(v)}`),
         },
       },
     },
@@ -217,11 +228,16 @@ export default function Dashboard() {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx) => `${ctx.dataset.label}: ${formatInr(ctx.parsed.y)}`,
+          label: (ctx) =>
+            `${ctx.dataset.label}: ${
+              revenueChartData._isUsd
+                ? formatUsd(ctx.parsed.y)
+                : formatInr(ctx.parsed.y)
+            }`,
         },
       },
     },
-  }), [chartPalette]);
+  }), [chartPalette, revenueChartData]);
 
   const signupsChartData = useMemo(() => {
     const points = timeseries?.points || [];
@@ -419,7 +435,10 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-slate-600 dark:text-slate-300 font-medium">{typeLabel}</td>
-                      <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">{formatInr(tx.amountInr)}</td>
+                      <td className="px-5 py-3.5 text-slate-900 dark:text-white font-semibold">
+                        {tx.amountUsd != null ? formatUsd(tx.amountUsd) : '—'}
+                        <span className="block text-[11px] font-normal text-slate-400">{formatInr(tx.amountInr)}</span>
+                      </td>
                       <td className="px-5 py-3.5">
                         <PaymentInstrument instrument={tx.paymentInstrument} channel={tx.channel} />
                       </td>

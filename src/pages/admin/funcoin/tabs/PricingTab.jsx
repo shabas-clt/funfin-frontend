@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import { funcoinPriceSchema } from '@/lib/validation/schemas';
-import { formatInr, formatShortDateTime } from '@/lib/format';
+import { formatInr, formatUsd, formatShortDateTime } from '@/lib/format';
 import FieldError from '@/components/shared/FieldError';
 
 const PAGE_SIZE = 10;
@@ -27,7 +27,7 @@ export default function PricingTab() {
   } = useForm({
     resolver: yupResolver(funcoinPriceSchema),
     mode: 'onChange',
-    defaultValues: { pricePerCoin: '', note: '' },
+    defaultValues: { pricePerCoin: '', pricePerCoinUsd: '', note: '' },
   });
 
   const loadCurrent = useCallback(async () => {
@@ -35,7 +35,11 @@ export default function PricingTab() {
       setLoadingCurrent(true);
       const res = await api.get('/funcoin/price');
       setCurrent(res);
-      reset({ pricePerCoin: res?.pricePerCoin ?? '', note: '' });
+      reset({
+        pricePerCoin: res?.pricePerCoin ?? '',
+        pricePerCoinUsd: res?.pricePerCoinUsd ?? '',
+        note: '',
+      });
     } catch {
       toast.error('Failed to load current price');
     } finally {
@@ -66,14 +70,22 @@ export default function PricingTab() {
 
   const onSubmit = async (values) => {
     try {
-      const res = await api.patch('/funcoin/price', {
+      const body = {
         pricePerCoin: Number(values.pricePerCoin),
         note: values.note?.trim() || undefined,
-      });
+      };
+      // When admin supplies USD, treat as canonical (backend derives INR).
+      if (values.pricePerCoinUsd !== '' && values.pricePerCoinUsd != null) {
+        body.pricePerCoinUsd = Number(values.pricePerCoinUsd);
+      }
+      const res = await api.patch('/funcoin/price', body);
       setCurrent(res);
       toast.success('Price updated');
-      // Reset note but keep the new price displayed in the field.
-      reset({ pricePerCoin: res?.pricePerCoin ?? '', note: '' });
+      reset({
+        pricePerCoin: res?.pricePerCoin ?? '',
+        pricePerCoinUsd: res?.pricePerCoinUsd ?? '',
+        note: '',
+      });
       // Refresh history from the top because a new row now exists.
       loadHistory(0);
     } catch (err) {
@@ -92,23 +104,47 @@ export default function PricingTab() {
             <div>
               <div className="text-sm text-slate-500 dark:text-slate-400">Current rate</div>
               <div className="text-2xl font-semibold text-slate-900 dark:text-white">
-                {loadingCurrent ? '—' : formatInr(current?.pricePerCoin)}
+                {loadingCurrent
+                  ? '—'
+                  : current?.pricePerCoinUsd != null
+                  ? formatUsd(current.pricePerCoinUsd)
+                  : formatInr(current?.pricePerCoin)}
                 <span className="text-sm text-slate-500 dark:text-slate-400 font-medium"> / coin</span>
               </div>
+              {!loadingCurrent && current?.pricePerCoinUsd != null && (
+                <div className="text-xs text-slate-400">≈ {formatInr(current?.pricePerCoin)}</div>
+              )}
             </div>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                New price (INR per coin)
+                New price (USD per coin) — canonical
+              </label>
+              <input
+                type="number"
+                step="0.0001"
+                {...register('pricePerCoinUsd', { valueAsNumber: true })}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g. 0.012"
+                disabled={isSubmitting}
+              />
+              <FieldError error={errors.pricePerCoinUsd} />
+              <p className="mt-1 text-[11px] text-slate-400">
+                Leave empty to set INR canonically; backend derives the other.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                New price (INR per coin) — required, derived if USD given
               </label>
               <input
                 type="number"
                 step="0.01"
                 {...register('pricePerCoin', { valueAsNumber: true })}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="e.g. 0.10"
+                placeholder="e.g. 1.00"
                 disabled={isSubmitting}
               />
               <FieldError error={errors.pricePerCoin} />
@@ -169,8 +205,13 @@ export default function PricingTab() {
                 <div key={row.id} className="py-2.5 flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {formatInr(row.pricePerCoin)}
+                      {row.pricePerCoinUsd != null
+                        ? formatUsd(row.pricePerCoinUsd)
+                        : formatInr(row.pricePerCoin)}
                     </div>
+                    {row.pricePerCoinUsd != null && (
+                      <div className="text-[11px] text-slate-400">≈ {formatInr(row.pricePerCoin)}</div>
+                    )}
                     {row.note && (
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         {row.note}

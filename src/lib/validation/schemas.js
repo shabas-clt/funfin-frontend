@@ -139,11 +139,18 @@ const tagsField = yup
 export const courseCreateSchema = yup.object({
   title: requiredString('Title').min(2).max(140),
   description: requiredString('Description').min(10),
-  priceInr: yup
+  // USD is the canonical price during INR->USD migration. priceInr stays
+  // accepted as an optional fallback; backend derives whichever is missing.
+  priceUsd: yup
     .number()
     .typeError('Price must be a number')
     .min(0, 'Price cannot be negative')
     .required('Price is required'),
+  priceInr: yup
+    .number()
+    .typeError('Price (INR) must be a number')
+    .min(0, 'Price cannot be negative')
+    .optional(),
   photo: yup.string().trim().optional(),
   videoUrl: yup.string().trim().optional(),
   level: yup.string().oneOf(levelEnum, 'Invalid level').default('beginner'),
@@ -158,9 +165,14 @@ export const courseCreateSchema = yup.object({
 export const courseUpdateSchema = yup.object({
   title: yup.string().trim().min(2).max(140).optional(),
   description: yup.string().trim().min(10).optional(),
-  priceInr: yup
+  priceUsd: yup
     .number()
     .typeError('Price must be a number')
+    .min(0, 'Price cannot be negative')
+    .optional(),
+  priceInr: yup
+    .number()
+    .typeError('Price (INR) must be a number')
     .min(0, 'Price cannot be negative')
     .optional(),
   photo: yup.string().trim().optional(),
@@ -265,6 +277,12 @@ export const funcoinPriceSchema = yup.object({
     .typeError('Price must be a number')
     .positive('Price must be greater than 0')
     .required('Price is required'),
+  // USD canonical (optional; backend derives INR if supplied).
+  pricePerCoinUsd: yup
+    .number()
+    .typeError('USD price must be a number')
+    .positive('USD price must be greater than 0')
+    .optional(),
   note: yup.string().trim().max(200, 'Note is too long').optional(),
 });
 
@@ -353,11 +371,24 @@ export const couponCreateSchema = yup.object({
     .min(0)
     .nullable()
     .transform((v, o) => (o === '' || o === null || o === undefined ? null : v)),
+  // USD canonical mirrors (optional; backend derives from the other when missing).
+  maxDiscountUsd: yup
+    .number()
+    .typeError('Max discount (USD) must be a number')
+    .min(0)
+    .nullable()
+    .transform((v, o) => (o === '' || o === null || o === undefined ? null : v)),
   minOrderAmountInr: yup
     .number()
     .typeError('Minimum order amount must be a number')
     .min(0)
     .default(0),
+  minOrderAmountUsd: yup
+    .number()
+    .typeError('Minimum order amount (USD) must be a number')
+    .min(0)
+    .nullable()
+    .transform((v, o) => (o === '' || o === null || o === undefined ? null : v)),
   perUserLimit: yup
     .number()
     .typeError('Per-user limit must be a number')
