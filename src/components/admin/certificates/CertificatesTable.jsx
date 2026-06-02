@@ -1,4 +1,4 @@
-import { Eye, Download, ShieldCheck } from 'lucide-react';
+import { Eye, Download, ShieldCheck, Trash2 } from 'lucide-react';
 import { formatShortDate, formatShortDateTime } from '@/lib/format';
 
 const TH =
@@ -19,7 +19,7 @@ function StatusBadge({ revoked }) {
   );
 }
 
-export default function CertificatesTable({ certificates, onViewDetails }) {
+export default function CertificatesTable({ certificates, onViewDetails, onDelete }) {
   return (
     <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden">
       <div className="overflow-x-auto px-2">
@@ -100,6 +100,14 @@ export default function CertificatesTable({ certificates, onViewDetails }) {
                     >
                       <ShieldCheck className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                     </a>
+                    <button
+                      onClick={() => onDelete(cert)}
+                      className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center"
+                      title="Delete certificate"
+                      aria-label="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                    </button>
                   </div>
                 </td>
               </tr>

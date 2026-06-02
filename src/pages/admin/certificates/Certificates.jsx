@@ -7,6 +7,7 @@ import { useAuth } from '../../../context/AuthContext';
 import CertificatesTable from '../../../components/admin/certificates/CertificatesTable';
 import CertificateFilters from '../../../components/admin/certificates/CertificateFilters';
 import CertificateDetailsModal from '../../../components/admin/certificates/CertificateDetailsModal';
+import DeleteCertificateDialog from '../../../components/admin/certificates/DeleteCertificateDialog';
 
 export default function Certificates() {
   const { isAuthenticated } = useAuth();
@@ -22,6 +23,8 @@ export default function Certificates() {
   });
   const [selected, setSelected] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [toDelete, setToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const limit = 20;
 
@@ -61,6 +64,22 @@ export default function Certificates() {
   const handleViewDetails = (cert) => {
     setSelected(cert);
     setShowDetails(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await certificatesApi.remove(toDelete.certificateId);
+      toast.success('Certificate deleted');
+      setToDelete(null);
+      loadCertificates(true);
+    } catch (error) {
+      const message = typeof error === 'string' ? error : 'Failed to delete certificate';
+      toast.error(message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -109,7 +128,11 @@ export default function Certificates() {
         </div>
       ) : (
         <>
-          <CertificatesTable certificates={certificates} onViewDetails={handleViewDetails} />
+          <CertificatesTable
+            certificates={certificates}
+            onViewDetails={handleViewDetails}
+            onDelete={setToDelete}
+          />
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-2">
             <span className="text-slate-500 dark:text-slate-400 text-sm">
@@ -147,6 +170,15 @@ export default function Certificates() {
             setShowDetails(false);
             setSelected(null);
           }}
+        />
+      )}
+
+      {toDelete && (
+        <DeleteCertificateDialog
+          certificate={toDelete}
+          deleting={deleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setToDelete(null)}
         />
       )}
     </div>
