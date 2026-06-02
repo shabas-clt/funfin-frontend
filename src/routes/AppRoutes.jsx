@@ -12,6 +12,7 @@ import MentorManagement from '../pages/admin/mentors/MentorManagement';
 import FuncoinManagement from '../pages/admin/funcoin/FuncoinManagement';
 import CouponManagement from '../pages/admin/coupons/CouponManagement';
 import CourseProgress from '../pages/admin/courses/CourseProgress';
+import Certificates from '../pages/admin/certificates/Certificates';
 import GamificationManagement from '../pages/admin/gamification/GamificationManagement';
 import NotificationBroadcast from '../pages/admin/notifications/NotificationBroadcast';
 import LiveChart from '../pages/admin/live-chart/LiveChart';
@@ -53,6 +54,7 @@ const AppRoutes = () => {
             <Route path="courses/new" element={<PageTransition><CourseEditor /></PageTransition>} />
             <Route path="courses/:id/edit" element={<PageTransition><CourseEditor /></PageTransition>} />
             <Route path="courses/:id/progress" element={<PageTransition><CourseProgress /></PageTransition>} />
+            <Route path="certificates" element={<PageTransition><Certificates /></PageTransition>} />
             <Route path="students" element={<PageTransition><StudentManagement /></PageTransition>} />
             <Route path="admins" element={<PageTransition><AdminManagement /></PageTransition>} />
             <Route path="mentors" element={<PageTransition><MentorManagement /></PageTransition>} />
