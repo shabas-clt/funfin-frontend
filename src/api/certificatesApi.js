@@ -8,4 +8,7 @@ export const certificatesApi = {
 
   // GET /api/v1/certificates/{certificateId} -> certificate detail
   get: async (certificateId) => api.get(`/certificates/${certificateId}`),
+
+  // DELETE /api/v1/certificates/{certificateId} -> removes record + stored PDF
+  remove: async (certificateId) => api.delete(`/certificates/${certificateId}`),
 };
