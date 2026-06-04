@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Trash, Eye, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Trash, Eye, ArrowUpDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { FilterDropdown } from '@/components/ui/filter-dropdown';
@@ -32,6 +32,8 @@ export default function StudentManagement() {
   const [skip, setSkip] = useState(0);
   const [total, setTotal] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [view, setView] = useState('active'); // 'active' | 'archived'
+  const isArchived = view === 'archived';
 
   const fetchStudents = async (nextSkip = skip) => {
     try {
@@ -43,16 +45,18 @@ export default function StudentManagement() {
         'name-desc': { sortBy: 'name', sortOrder: 'desc' },
       };
       const sortCfg = sortMap[sortBy] || sortMap.newest;
-      const res = await api.get('/students', {
-        params: {
-          skip: nextSkip,
-          limit: PAGE_SIZE,
-          q: searchQuery || undefined,
-          role: filterRole || undefined,
-          sortBy: sortCfg.sortBy,
-          sortOrder: sortCfg.sortOrder,
-        },
-      });
+      const endpoint = isArchived ? '/students/archived' : '/students';
+      const params = isArchived
+        ? { skip: nextSkip, limit: PAGE_SIZE, q: searchQuery || undefined }
+        : {
+            skip: nextSkip,
+            limit: PAGE_SIZE,
+            q: searchQuery || undefined,
+            role: filterRole || undefined,
+            sortBy: sortCfg.sortBy,
+            sortOrder: sortCfg.sortOrder,
+          };
+      const res = await api.get(endpoint, { params });
       setStudents(res.students || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
@@ -67,7 +71,28 @@ export default function StudentManagement() {
 
   useEffect(() => {
     fetchStudents(0);
-  }, [searchQuery, filterRole, sortBy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, filterRole, sortBy, view]);
+
+  const handleRecover = async (id) => {
+    const result = await Swal.fire({
+      title: 'Recover account?',
+      text: 'The user will be able to log in again.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#16a34a',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, recover',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await api.post(`/students/${id}/recover`);
+      fetchStudents();
+      toast.success('Account recovered');
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to recover account');
+    }
+  };
 
   const handleDelete = async (id) => {
     const result = await Swal.fire({
@@ -100,6 +125,22 @@ export default function StudentManagement() {
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">
             Student accounts are created through client-side signup. Admins can review, inspect, and remove them here.
           </p>
+        </div>
+        <div className="inline-flex rounded-lg border border-slate-200 dark:border-neutral-800 p-0.5 bg-slate-50 dark:bg-neutral-900 self-start">
+          {['active', 'archived'].map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`px-3.5 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
+                view === v
+                  ? 'bg-white dark:bg-neutral-950 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              {v}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -175,13 +216,23 @@ export default function StudentManagement() {
                     >
                       <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(student.id)}
-                      className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center"
-                      aria-label="Delete"
-                    >
-                      <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-                    </button>
+                    {isArchived ? (
+                      <button
+                        onClick={() => handleRecover(student.id)}
+                        className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center"
+                        aria-label="Recover"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDelete(student.id)}
+                        className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center"
+                        aria-label="Delete"
+                      >
+                        <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -243,13 +294,23 @@ export default function StudentManagement() {
                           >
                             <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(student.id)}
-                            className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center"
-                            aria-label="Delete"
-                          >
-                            <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-                          </button>
+                          {isArchived ? (
+                            <button
+                              onClick={() => handleRecover(student.id)}
+                              className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center justify-center"
+                              aria-label="Recover"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(student.id)}
+                              className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors flex items-center justify-center"
+                              aria-label="Delete"
+                            >
+                              <Trash className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
