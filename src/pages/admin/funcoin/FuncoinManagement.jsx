@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Coins, List, ArrowRightLeft, ShoppingBag } from 'lucide-react';
+import { Coins, List, ArrowRightLeft, ShoppingBag, Package } from 'lucide-react';
 import PricingTab from './tabs/PricingTab';
 import CategoriesTab from './tabs/CategoriesTab';
 import TransactionsTab from './tabs/TransactionsTab';
 import PurchasesTab from './tabs/PurchasesTab';
+import PacksTab from './tabs/PacksTab';
 
 // Tabs are rendered in place (no route params) because most admins will
 // flip between pricing / transactions / purchases while investigating a
@@ -12,6 +13,7 @@ import PurchasesTab from './tabs/PurchasesTab';
 
 const TABS = [
   { id: 'pricing', label: 'Pricing', icon: Coins },
+  { id: 'packs', label: 'Coin Packs', icon: Package },
   { id: 'categories', label: 'Categories', icon: List },
   { id: 'transactions', label: 'Transactions', icon: ArrowRightLeft },
   { id: 'purchases', label: 'Purchases', icon: ShoppingBag },
@@ -60,6 +62,7 @@ export default function FuncoinManagement() {
 
       <div>
         {tab === 'pricing' && <PricingTab />}
+        {tab === 'packs' && <PacksTab />}
         {tab === 'categories' && <CategoriesTab />}
         {tab === 'transactions' && <TransactionsTab />}
         {tab === 'purchases' && <PurchasesTab />}
