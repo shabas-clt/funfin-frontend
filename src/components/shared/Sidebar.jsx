@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   Radio, X, Coins, Tag, Gamepad2, Bell, UserRound, TrendingUp, LineChart,
   Database, Key, MessageSquare, Share2, Trophy, BarChart3, Activity, DollarSign,
-  Award,
+  Award, Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
@@ -29,6 +29,7 @@ const adminMenus = [
   { name: 'Memes', path: '/admin/memes', icon: MessageSquare },
   { name: 'Referral Config', path: '/admin/referrals/config', icon: Share2 },
   { name: 'Referral Records', path: '/admin/referrals/records', icon: Users },
+  { name: 'Referral Payouts', path: '/admin/referrals/payouts', icon: Wallet },
   { name: 'Leaderboards', path: '/admin/leaderboards', icon: Trophy },
   { header: 'Simulation Trading' },
   { name: 'Stock Charts', path: '/admin/simulation/stocks', icon: Activity },

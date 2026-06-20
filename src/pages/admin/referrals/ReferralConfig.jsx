@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/api/axios';
+import { referralApi } from '@/api/referralApi';
 import { useAuth } from '../../../context/AuthContext';
 import ConfigForm from '../../../components/admin/referrals/ConfigForm';
 
@@ -15,7 +15,7 @@ export default function ReferralConfig() {
     setLoading(true);
 
     try {
-      const data = await api.get('/admin/referral/config');
+      const data = await referralApi.getConfig();
       setConfig(data);
     } catch (error) {
       const message = typeof error === 'string' ? error : 'Failed to load config';
@@ -32,7 +32,7 @@ export default function ReferralConfig() {
 
   const handleSave = async (formData) => {
     try {
-      const updated = await api.put('/admin/referral/config', formData);
+      const updated = await referralApi.updateConfig(formData);
       setConfig(updated);
       toast.success('Configuration updated successfully');
     } catch (error) {
