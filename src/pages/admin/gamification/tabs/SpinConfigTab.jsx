@@ -14,9 +14,15 @@ const REWARD_TYPES = [
   { value: 'coins', label: 'Fixed coins' },
   { value: 'mystery_box', label: 'Mystery box (range)' },
   { value: 'multiplier', label: 'Multiplier' },
+  { value: 'try_again', label: 'Try again (extra spin)' },
 ];
 
-function TierRow({ tier, onChange, onRemove }) {
+// A "try again" tier pays nothing — the backend ignores `coins` for it and
+// hands back `extraSpins` instead — so the coins box is disabled rather than
+// left showing a figure that never gets awarded.
+const PAYS_NO_COINS = new Set(['mystery_box', 'try_again']);
+
+function TierRow({ tier, onChange, onRemove, share }) {
   const set = (patch) => onChange({ ...tier, ...patch });
 
   return (
@@ -40,7 +46,7 @@ function TierRow({ tier, onChange, onRemove }) {
           min={0}
           value={tier.coins}
           onChange={(e) => set({ coins: Number(e.target.value) || 0 })}
-          disabled={tier.rewardType === 'mystery_box'}
+          disabled={PAYS_NO_COINS.has(tier.rewardType)}
           className="w-24 px-2 py-1.5 rounded border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm disabled:opacity-50"
         />
       </td>
@@ -82,10 +88,34 @@ function TierRow({ tier, onChange, onRemove }) {
         <input
           type="number"
           min={1}
+          value={tier.extraSpins ?? ''}
+          onChange={(e) =>
+            set({ extraSpins: e.target.value === '' ? null : Number(e.target.value) })
+          }
+          disabled={tier.rewardType !== 'try_again'}
+          placeholder="—"
+          className="w-20 px-2 py-1.5 rounded border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm disabled:opacity-50"
+        />
+      </td>
+      <td className="px-3 py-2.5">
+        <input
+          type="number"
+          min={1}
           value={tier.weight}
           onChange={(e) => set({ weight: Number(e.target.value) || 1 })}
           className="w-20 px-2 py-1.5 rounded border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
         />
+      </td>
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        <span
+          className={
+            tier.isActive
+              ? 'text-sm font-medium text-slate-900 dark:text-white'
+              : 'text-sm text-slate-400 dark:text-slate-600'
+          }
+        >
+          {tier.isActive ? share : '—'}
+        </span>
       </td>
       <td className="px-3 py-2.5">
         <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
@@ -112,6 +142,7 @@ function TierRow({ tier, onChange, onRemove }) {
 
 export default function SpinConfigTab() {
   const [dailyLimit, setDailyLimit] = useState(1);
+  const [maxExtraSpinsPerDay, setMaxExtraSpinsPerDay] = useState(1);
   const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,6 +152,7 @@ export default function SpinConfigTab() {
       setLoading(true);
       const res = await api.get('/admin/gamification/spin-config');
       setDailyLimit(res.dailyLimit ?? 1);
+      setMaxExtraSpinsPerDay(res.maxExtraSpinsPerDay ?? 1);
       setTiers(res.rewardTiers || []);
     } catch {
       toast.error('Failed to load spin config');
@@ -137,6 +169,14 @@ export default function SpinConfigTab() {
     (sum, t) => sum + (t.isActive ? Number(t.weight) || 0 : 0),
     0,
   );
+
+  // Shown per row so the odds are read off the screen rather than worked out by
+  // hand — the weights only mean anything relative to the active total.
+  const shareOf = (tier) => {
+    if (!tier.isActive || totalWeight <= 0) return '—';
+    const pct = ((Number(tier.weight) || 0) / totalWeight) * 100;
+    return `${pct.toFixed(1)}%`;
+  };
 
   const updateTier = (idx, next) => {
     setTiers((prev) => prev.map((t, i) => (i === idx ? next : t)));
@@ -155,6 +195,7 @@ export default function SpinConfigTab() {
         minCoins: null,
         maxCoins: null,
         multiplier: null,
+        extraSpins: null,
       },
     ]);
   };
@@ -168,18 +209,23 @@ export default function SpinConfigTab() {
     try {
       const payload = {
         dailyLimit: Number(dailyLimit) || 1,
+        maxExtraSpinsPerDay: Number(maxExtraSpinsPerDay) || 0,
         rewardTiers: tiers.map((t) => ({
-          coins: Number(t.coins) || 0,
+          // A try-again pays no coins; send 0 so a figure left over from a
+          // previous reward type can't look like a payout it will never make.
+          coins: t.rewardType === 'try_again' ? 0 : Number(t.coins) || 0,
           weight: Number(t.weight) || 1,
           isActive: !!t.isActive,
           rewardType: t.rewardType,
           minCoins: t.rewardType === 'mystery_box' ? Number(t.minCoins) || null : null,
           maxCoins: t.rewardType === 'mystery_box' ? Number(t.maxCoins) || null : null,
           multiplier: t.rewardType === 'multiplier' ? Number(t.multiplier) || null : null,
+          extraSpins: t.rewardType === 'try_again' ? Number(t.extraSpins) || 1 : null,
         })),
       };
       const res = await api.patch('/admin/gamification/spin-config', payload);
       setDailyLimit(res.dailyLimit ?? 1);
+      setMaxExtraSpinsPerDay(res.maxExtraSpinsPerDay ?? 1);
       setTiers(res.rewardTiers || []);
       toast.success('Spin config updated');
     } catch (err) {
@@ -204,6 +250,21 @@ export default function SpinConfigTab() {
               onChange={(e) => setDailyLimit(Number(e.target.value) || 1)}
               className="w-32 px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+              Max extra spins per day
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={maxExtraSpinsPerDay}
+              onChange={(e) => setMaxExtraSpinsPerDay(Number(e.target.value) || 0)}
+              className="w-32 px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
+            />
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+              0 disables “try again”.
+            </p>
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 md:ml-auto">
             Active weight total: <span className="font-semibold text-slate-900 dark:text-white">{formatNumber(totalWeight)}</span>
@@ -247,7 +308,9 @@ export default function SpinConfigTab() {
                   <th className="px-3 py-2.5 font-medium">Min</th>
                   <th className="px-3 py-2.5 font-medium">Max</th>
                   <th className="px-3 py-2.5 font-medium">Multiplier</th>
+                  <th className="px-3 py-2.5 font-medium">Extra spins</th>
                   <th className="px-3 py-2.5 font-medium">Weight</th>
+                  <th className="px-3 py-2.5 font-medium">Probability</th>
                   <th className="px-3 py-2.5 font-medium">Status</th>
                   <th className="px-3 py-2.5 font-medium" />
                 </tr>
@@ -255,14 +318,14 @@ export default function SpinConfigTab() {
               <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
                 {loading && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-slate-500 text-sm">
+                    <td colSpan={10} className="px-4 py-6 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
                     </td>
                   </tr>
                 )}
                 {!loading && tiers.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-slate-500 text-sm">
+                    <td colSpan={10} className="px-4 py-6 text-center text-slate-500 text-sm">
                       No tiers configured. Add at least one.
                     </td>
                   </tr>
@@ -272,6 +335,7 @@ export default function SpinConfigTab() {
                     <TierRow
                       key={idx}
                       tier={tier}
+                      share={shareOf(tier)}
                       onChange={(next) => updateTier(idx, next)}
                       onRemove={() => removeTier(idx)}
                     />
