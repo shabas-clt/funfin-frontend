@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   Radio, X, Coins, Tag, Gamepad2, Bell, UserRound, TrendingUp, LineChart,
   Database, Key, MessageSquare, Share2, Trophy, BarChart3, Activity, DollarSign,
-  Award, Wallet,
+  Award, Wallet, CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
@@ -18,6 +18,7 @@ const adminMenus = [
   { name: 'Courses', path: '/admin/courses', icon: BookOpen },
   { name: 'Certificates', path: '/admin/certificates', icon: Award },
   { header: 'Commerce' },
+  { name: 'Payments', path: '/admin/payments', icon: CreditCard },
   { name: 'FunCoin', path: '/admin/funcoin', icon: Coins },
   { name: 'Coupons', path: '/admin/coupons', icon: Tag },
   { header: 'Engagement' },
