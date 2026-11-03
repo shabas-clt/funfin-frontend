@@ -10,6 +10,7 @@ import StudentManagement from '../pages/admin/students/StudentManagement';
 import AdminManagement from '../pages/admin/admins/AdminManagement';
 import MentorManagement from '../pages/admin/mentors/MentorManagement';
 import FuncoinManagement from '../pages/admin/funcoin/FuncoinManagement';
+import PaymentsManagement from '../pages/admin/payments/PaymentsManagement';
 import CouponManagement from '../pages/admin/coupons/CouponManagement';
 import CourseProgress from '../pages/admin/courses/CourseProgress';
 import Certificates from '../pages/admin/certificates/Certificates';
@@ -60,6 +61,7 @@ const AppRoutes = () => {
             <Route path="admins" element={<PageTransition><AdminManagement /></PageTransition>} />
             <Route path="mentors" element={<PageTransition><MentorManagement /></PageTransition>} />
             <Route path="funcoin" element={<PageTransition><FuncoinManagement /></PageTransition>} />
+            <Route path="payments" element={<PageTransition><PaymentsManagement /></PageTransition>} />
             <Route path="coupons" element={<PageTransition><CouponManagement /></PageTransition>} />
             <Route path="gamification" element={<PageTransition><GamificationManagement /></PageTransition>} />
             <Route path="notifications" element={<PageTransition><NotificationBroadcast /></PageTransition>} />
