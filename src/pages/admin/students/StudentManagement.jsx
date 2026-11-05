@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/modal';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
-import { formatShortDate } from '@/lib/format';
+import { formatShortDate, parseServerDate } from '@/lib/format';
 
 const FILTER_OPTIONS = ['All', 'user', 'mentor'];
 const PAGE_SIZE = 12;
@@ -17,6 +17,50 @@ const SORT_OPTIONS = [
   { value: 'name-asc', label: 'Name A-Z' },
   { value: 'name-desc', label: 'Name Z-A' },
 ];
+
+// Deleted accounts can be restored for 30 days; after that the purge job
+// erases them (backend P10-1). The backend says which applies to each row.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const graceInfo = (student) => {
+  if (student.purgedAt) {
+    return { label: 'Erased', tone: 'slate', canRecover: false };
+  }
+  if (student.canRecover && student.purgeAfter) {
+    const days = Math.max(1, Math.ceil((parseServerDate(student.purgeAfter) - Date.now()) / DAY_MS));
+    return { label: `${days} day${days === 1 ? '' : 's'} left to restore`, tone: 'amber', canRecover: true };
+  }
+  return { label: 'Erasing soon', tone: 'rose', canRecover: false };
+};
+
+const GRACE_TONES = {
+  slate: 'bg-slate-100 text-slate-600 dark:bg-neutral-800 dark:text-slate-300',
+  amber: 'bg-amber-100/70 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  rose: 'bg-rose-100/70 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300',
+};
+
+function GraceBadge({ student }) {
+  const info = graceInfo(student);
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${GRACE_TONES[info.tone]}`}>
+      {info.label}
+    </span>
+  );
+}
+
+function RecoverButton({ student, onRecover, size }) {
+  const info = graceInfo(student);
+  return (
+    <button
+      onClick={() => onRecover(student.id)}
+      disabled={!info.canRecover}
+      title={info.canRecover ? 'Restore account' : 'Past the 30-day restore window'}
+      className={`${size} rounded-lg bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed`}
+      aria-label="Recover"
+    >
+      <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+    </button>
+  );
+}
 
 const primaryRole = (roles) => {
   if (!Array.isArray(roles) || roles.length === 0) return 'user';
@@ -96,13 +140,13 @@ export default function StudentManagement() {
 
   const handleDelete = async (id) => {
     const result = await Swal.fire({
-      title: 'Remove student?',
-      text: 'This will permanently remove the student account.',
+      title: 'Erase student account?',
+      text: 'This signs them out everywhere and permanently erases their profile, posts, comments and payout bank details now. Purchase and payout records are kept without their name, for tax law. This cannot be undone.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#64748b',
-      confirmButtonText: 'Yes, remove',
+      confirmButtonText: 'Yes, erase',
       cancelButtonText: 'Cancel',
     });
 
@@ -111,9 +155,9 @@ export default function StudentManagement() {
     try {
       await api.delete(`/students/${id}`);
       fetchStudents();
-      toast.success('Student removed');
+      toast.success('Student account erased');
     } catch (error) {
-      toast.error(typeof error === 'string' ? error : 'Failed to remove student');
+      toast.error(typeof error === 'string' ? error : 'Failed to erase student');
     }
   };
 
@@ -123,7 +167,7 @@ export default function StudentManagement() {
         <div>
           <h1 className="text-[22px] font-semibold text-[#1e1b4b] dark:text-white">Students</h1>
           <p className="text-[#64748b] dark:text-slate-400 text-sm mt-1">
-            Student accounts are created through client-side signup. Admins can review, inspect, and remove them here.
+            Student accounts are created through client-side signup. Admins can review, inspect, and erase them here. Deleted accounts can be restored for 30 days.
           </p>
         </div>
         <div className="inline-flex rounded-lg border border-slate-200 dark:border-neutral-800 p-0.5 bg-slate-50 dark:bg-neutral-900 self-start">
@@ -206,6 +250,7 @@ export default function StudentManagement() {
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${roleClass}`}>{role}</span>
                       <span className="text-[10px] text-slate-400">{formatShortDate(student.createdAt)}</span>
+                      {isArchived && <GraceBadge student={student} />}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -217,13 +262,7 @@ export default function StudentManagement() {
                       <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                     </button>
                     {isArchived ? (
-                      <button
-                        onClick={() => handleRecover(student.id)}
-                        className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center"
-                        aria-label="Recover"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      </button>
+                      <RecoverButton student={student} onRecover={handleRecover} size="w-8 h-8" />
                     ) : (
                       <button
                         onClick={() => handleDelete(student.id)}
@@ -276,6 +315,7 @@ export default function StudentManagement() {
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{student.fullName || 'Unknown User'}</p>
                             <p className="text-[11px] text-slate-400 font-normal">#{student.id}</p>
+                            {isArchived && <div className="mt-1"><GraceBadge student={student} /></div>}
                           </div>
                         </div>
                       </td>
@@ -295,13 +335,7 @@ export default function StudentManagement() {
                             <Eye className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                           </button>
                           {isArchived ? (
-                            <button
-                              onClick={() => handleRecover(student.id)}
-                              className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center justify-center"
-                              aria-label="Recover"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            </button>
+                            <RecoverButton student={student} onRecover={handleRecover} size="w-7 h-7" />
                           ) : (
                             <button
                               onClick={() => handleDelete(student.id)}

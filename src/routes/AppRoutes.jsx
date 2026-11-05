@@ -11,6 +11,7 @@ import AdminManagement from '../pages/admin/admins/AdminManagement';
 import MentorManagement from '../pages/admin/mentors/MentorManagement';
 import FuncoinManagement from '../pages/admin/funcoin/FuncoinManagement';
 import PaymentsManagement from '../pages/admin/payments/PaymentsManagement';
+import ModerationQueue from '../pages/admin/moderation/ModerationQueue';
 import CouponManagement from '../pages/admin/coupons/CouponManagement';
 import CourseProgress from '../pages/admin/courses/CourseProgress';
 import Certificates from '../pages/admin/certificates/Certificates';
@@ -71,6 +72,7 @@ const AppRoutes = () => {
             <Route path="live-engine/tokens" element={<PageTransition><TokenManagement /></PageTransition>} />
             
             {/* New admin panel features */}
+            <Route path="moderation" element={<PageTransition><ModerationQueue /></PageTransition>} />
             <Route path="memes" element={<PageTransition><MemesList /></PageTransition>} />
             <Route path="memes/posting-categories" element={<PageTransition><PostingCategories /></PageTransition>} />
             <Route path="memes/content-categories" element={<PageTransition><ContentCategories /></PageTransition>} />
