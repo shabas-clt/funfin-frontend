@@ -60,6 +60,23 @@ export function formatShortDateTime(value) {
 }
 
 /**
+ * The backend stores UTC without a timezone marker (e.g. "2026-11-05T09:22:26"),
+ * which `new Date()` would read as local time. Treat unmarked values as UTC.
+ */
+export function parseServerDate(value) {
+  if (!value) return null;
+  const s = String(value);
+  const hasZone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(s);
+  const d = new Date(hasZone || !s.includes('T') ? s : `${s}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function formatServerDateTime(value) {
+  const d = parseServerDate(value);
+  return d ? formatShortDateTime(d) : '—';
+}
+
+/**
  * Label axis dates like "12 Apr" from a YYYY-MM-DD string. We explicitly
  * parse as local-midnight to keep the label stable regardless of TZ.
  */

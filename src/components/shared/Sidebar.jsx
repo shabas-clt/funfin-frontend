@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   Radio, X, Coins, Tag, Gamepad2, Bell, UserRound, TrendingUp, LineChart,
   Database, Key, MessageSquare, Share2, Trophy, BarChart3, Activity, DollarSign,
-  Award, Wallet, CreditCard,
+  Award, Wallet, CreditCard, ShieldAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
@@ -27,6 +27,7 @@ const adminMenus = [
   { name: 'Gamification', path: '/admin/gamification', icon: Gamepad2 },
   { name: 'Notifications', path: '/admin/notifications', icon: Bell },
   { header: 'Community' },
+  { name: 'Moderation', path: '/admin/moderation', icon: ShieldAlert },
   { name: 'Memes', path: '/admin/memes', icon: MessageSquare },
   { name: 'Referral Config', path: '/admin/referrals/config', icon: Share2 },
   { name: 'Referral Records', path: '/admin/referrals/records', icon: Users },
