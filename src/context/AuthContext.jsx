@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import Cookies from 'js-cookie';
 import { api } from '@/api/axios';
 import { clearPageCache } from '@/lib/pageCache';
+import { setSentryAdmin } from '@/lib/sentry';
 
 const AuthContext = createContext(null);
 
@@ -36,6 +37,11 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     setAdmin(null);
   }, []);
+
+  // Tag error reports with the signed-in admin (id and role only).
+  useEffect(() => {
+    setSentryAdmin(admin);
+  }, [admin]);
 
   useEffect(() => {
     const hydrateSession = async () => {

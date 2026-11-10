@@ -38,6 +38,9 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_CLIENT_API_URL: ${{ secrets.VITE_CLIENT_API_URL }}
           VITE_LIVE_ENGINE_URL: ${{ secrets.VITE_LIVE_ENGINE_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_APP_RELEASE: ${{ github.sha }}
 
   build-and-deploy:
     if: github.event_name != 'pull_request'
@@ -62,6 +65,9 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_CLIENT_API_URL: ${{ secrets.VITE_CLIENT_API_URL }}
           VITE_LIVE_ENGINE_URL: ${{ secrets.VITE_LIVE_ENGINE_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_APP_RELEASE: ${{ github.sha }}
 
       - name: Rsync dist to VPS
         env:

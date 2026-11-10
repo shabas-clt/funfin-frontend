@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { reportApiError } from '@/lib/sentry';
 
 const ADMIN_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api/v1';
 const CLIENT_BASE_URL = import.meta.env.VITE_CLIENT_API_URL || 'http://localhost:5001/api/v1';
@@ -33,6 +34,7 @@ const requestInterceptor = (config) => {
 const responseInterceptor = (response) => response.data;
 
 const errorInterceptor = (error) => {
+  reportApiError(error);
   const status = error.response?.status;
   const detail = error.response?.data?.detail || error.response?.data || error.message;
 
