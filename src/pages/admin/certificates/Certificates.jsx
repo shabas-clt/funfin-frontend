@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, PenLine } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { certificatesApi } from '@/api/certificatesApi';
 import { useAuth } from '../../../context/AuthContext';
@@ -8,6 +8,7 @@ import CertificatesTable from '../../../components/admin/certificates/Certificat
 import CertificateFilters from '../../../components/admin/certificates/CertificateFilters';
 import CertificateDetailsModal from '../../../components/admin/certificates/CertificateDetailsModal';
 import DeleteCertificateDialog from '../../../components/admin/certificates/DeleteCertificateDialog';
+import CertificateSignaturesModal from '../../../components/admin/certificates/CertificateSignaturesModal';
 
 export default function Certificates() {
   const { isAuthenticated } = useAuth();
@@ -25,6 +26,7 @@ export default function Certificates() {
   const [showDetails, setShowDetails] = useState(false);
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [showSignatures, setShowSignatures] = useState(false);
 
   const limit = 20;
 
@@ -95,6 +97,15 @@ export default function Certificates() {
             Issued course-completion certificates
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowSignatures(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-neutral-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 dark:hover:bg-neutral-900 transition-colors text-sm font-medium"
+        >
+          <PenLine className="w-4 h-4" />
+          Signatures
+        </button>
         <button
           onClick={handleRefresh}
           disabled={loading}
@@ -103,7 +114,10 @@ export default function Certificates() {
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
+        </div>
       </div>
+
+      <CertificateSignaturesModal isOpen={showSignatures} onClose={() => setShowSignatures(false)} />
 
       <CertificateFilters filters={filters} setFilters={setFilters} setPage={setPage} />
 

@@ -11,4 +11,14 @@ export const certificatesApi = {
 
   // DELETE /api/v1/certificates/{certificateId} -> removes record + stored PDF
   remove: async (certificateId) => api.delete(`/certificates/${certificateId}`),
+
+  // Signature blocks printed on certificates (mentor + director).
+  // GET -> { saved: {...}, effective: {...}, updatedAt }
+  getSignatories: async () => api.get('/certificate-settings'),
+
+  // PUT { instructorName, instructorTitle, directorName, directorTitle }
+  saveSignatories: async (values) => api.put('/certificate-settings', values),
+
+  // Sample certificate PDF using the saved signatories -> Blob
+  previewPdf: async () => api.get('/certificate-settings/preview', { responseType: 'blob' }),
 };
