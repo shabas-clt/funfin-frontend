@@ -206,7 +206,7 @@ const SimulationTrades = () => {
                   Entry Price
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                  Exit Price
+                  Exit / Current
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                   P&L
@@ -235,6 +235,12 @@ const SimulationTrades = () => {
               ) : (
                 filteredTrades.map((trade) => {
                   const pnl = trade.profitLoss || 0;
+                  const isOpen = trade.status === TRADE_STATUS.OPEN;
+                  // Open trades: the backend sends what closing now would net
+                  // (same settlement math the app shows the user). No price
+                  // (feed down) means no P&L to show.
+                  const hasLivePnl = isOpen && trade.currentPrice != null;
+                  const priceNote = trade.marketOpen === false ? 'last close' : 'now';
                   const pnlColor = pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
                   const PnlIcon = pnl >= 0 ? TrendingUp : TrendingDown;
 
@@ -271,7 +277,16 @@ const SimulationTrades = () => {
                         ${formatCurrency(trade.entryPrice)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-900 dark:text-white">
-                        {trade.exitPrice ? `$${formatCurrency(trade.exitPrice)}` : '-'}
+                        {trade.exitPrice ? (
+                          `$${formatCurrency(trade.exitPrice)}`
+                        ) : hasLivePnl ? (
+                          <span className="inline-flex flex-col items-end leading-tight">
+                            <span>${formatCurrency(trade.currentPrice)}</span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">{priceNote}</span>
+                          </span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className={`px-4 py-3 text-right text-sm font-semibold ${pnlColor}`}>
                         {trade.status === TRADE_STATUS.CLOSED ? (
@@ -279,8 +294,22 @@ const SimulationTrades = () => {
                             <PnlIcon className="h-3 w-3" />
                             {pnl >= 0 ? '+' : ''}{pnl} coins
                           </span>
+                        ) : hasLivePnl ? (
+                          <span
+                            className="inline-flex flex-col items-end leading-tight"
+                            title={`Unrealised: what this trade would net if closed at the ${priceNote === 'now' ? 'current' : 'last close'} price`}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              <PnlIcon className="h-3 w-3" />
+                              {pnl >= 0 ? '+' : ''}{pnl} coins
+                            </span>
+                            <span className="text-[11px] font-medium opacity-80">
+                              {(trade.profitLossPercentage ?? 0) >= 0 ? '+' : ''}
+                              {(trade.profitLossPercentage ?? 0).toFixed(2)}% · live
+                            </span>
+                          </span>
                         ) : (
-                          '-'
+                          <span className="text-slate-400 dark:text-slate-500" title="No live price right now">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm">
