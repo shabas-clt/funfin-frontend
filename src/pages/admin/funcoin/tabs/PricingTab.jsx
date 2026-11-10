@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Loader2, Save, Coins } from 'lucide-react';
@@ -8,64 +8,90 @@ import { toast } from 'react-toastify';
 import { funcoinPriceSchema } from '@/lib/validation/schemas';
 import { formatInr, formatUsd, formatShortDateTime } from '@/lib/format';
 import FieldError from '@/components/shared/FieldError';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 const PAGE_SIZE = 10;
 
 export default function PricingTab() {
-  const [current, setCurrent] = useState(null);
+  // Rate and history are cached so reopening this tab shows them at once
+  // while they refresh. Each card shows as soon as its own request returns.
+  const [current, setCurrent] = useCachedState('funcoin-pricing:current', null);
   const [loadingCurrent, setLoadingCurrent] = useState(true);
-  const [history, setHistory] = useState([]);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  const [history, setHistory] = useCachedState('funcoin-pricing:history', []);
+  const [historyTotal, setHistoryTotal] = useCachedState('funcoin-pricing:historyTotal', 0);
+  const [skip, setSkip] = useCachedState('funcoin-pricing:skip', 0);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const showCurrentSkeleton = loadingCurrent && !hasCached('funcoin-pricing:current');
+  const showHistorySkeleton = loadingHistory && !hasCached('funcoin-pricing:history');
+  const isRefreshingHistory = loadingHistory && !showHistorySkeleton;
+  // Stable functions; a slower response for an older history page is dropped.
+  const { begin, isLatest } = useLatestRequest();
+  // The history page restored on open.
+  const restoredSkip = useRef(skip);
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm({
     resolver: yupResolver(funcoinPriceSchema),
     mode: 'onChange',
-    defaultValues: { pricePerCoin: '', pricePerCoinUsd: '', note: '' },
+    defaultValues: {
+      pricePerCoin: current?.pricePerCoin ?? '',
+      pricePerCoinUsd: current?.pricePerCoinUsd ?? '',
+      note: '',
+    },
   });
+  // A background refresh fills the form only while the admin has not typed
+  // in it, so it never overwrites a price being entered.
+  const isDirtyRef = useRef(false);
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
 
   const loadCurrent = useCallback(async () => {
     try {
       setLoadingCurrent(true);
       const res = await api.get('/funcoin/price');
       setCurrent(res);
-      reset({
-        pricePerCoin: res?.pricePerCoin ?? '',
-        pricePerCoinUsd: res?.pricePerCoinUsd ?? '',
-        note: '',
-      });
+      if (!isDirtyRef.current) {
+        reset({
+          pricePerCoin: res?.pricePerCoin ?? '',
+          pricePerCoinUsd: res?.pricePerCoinUsd ?? '',
+          note: '',
+        });
+      }
     } catch {
       toast.error('Failed to load current price');
     } finally {
       setLoadingCurrent(false);
     }
-  }, [reset]);
+  }, [reset, setCurrent]);
 
   const loadHistory = useCallback(async (nextSkip = 0) => {
+    const id = begin();
     try {
       setLoadingHistory(true);
       const res = await api.get('/funcoin/pricing-history', {
         params: { skip: nextSkip, limit: PAGE_SIZE },
       });
+      if (!isLatest(id)) return;
       setHistory(res.history || []);
       setHistoryTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!isLatest(id)) return;
       toast.error('Failed to load pricing history');
     } finally {
-      setLoadingHistory(false);
+      if (isLatest(id)) setLoadingHistory(false);
     }
-  }, []);
+  }, [begin, isLatest, setHistory, setHistoryTotal, setSkip]);
 
   useEffect(() => {
     loadCurrent();
-    loadHistory(0);
+    // On open, refresh the history page the admin was on.
+    loadHistory(restoredSkip.current);
   }, [loadCurrent, loadHistory]);
 
   const onSubmit = async (values) => {
@@ -104,14 +130,14 @@ export default function PricingTab() {
             <div>
               <div className="text-sm text-slate-500 dark:text-slate-400">Current rate</div>
               <div className="text-2xl font-semibold text-slate-900 dark:text-white">
-                {loadingCurrent
+                {showCurrentSkeleton
                   ? '—'
                   : current?.pricePerCoinUsd != null
                   ? formatUsd(current.pricePerCoinUsd)
                   : formatInr(current?.pricePerCoin)}
                 <span className="text-sm text-slate-500 dark:text-slate-400 font-medium"> / coin</span>
               </div>
-              {!loadingCurrent && current?.pricePerCoinUsd != null && (
+              {!showCurrentSkeleton && current?.pricePerCoinUsd != null && (
                 <div className="text-xs text-slate-400">≈ {formatInr(current?.pricePerCoin)}</div>
               )}
             </div>
@@ -191,7 +217,7 @@ export default function PricingTab() {
             </div>
           </div>
 
-          {loadingHistory ? (
+          {showHistorySkeleton ? (
             <div className="h-40 flex items-center justify-center text-sm text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin" /> <span className="ml-2">Loading…</span>
             </div>
@@ -200,7 +226,7 @@ export default function PricingTab() {
               No price changes yet.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-neutral-800">
+            <div className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshingHistory ? 'opacity-60' : ''}`}>
               {history.map((row) => (
                 <div key={row.id} className="py-2.5 flex items-start justify-between gap-3">
                   <div>

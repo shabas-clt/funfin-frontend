@@ -2,52 +2,60 @@ import { useState, useEffect } from 'react';
 import { Activity, Database, Key, TrendingUp, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 export default function LiveEngineDashboard() {
-  const [health, setHealth] = useState(null);
-  const [stats, setStats] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Cached so coming back to this page shows the last numbers at once while
+  // they refresh. Health and token stats load separately, so each section
+  // shows as soon as its own request returns.
+  const [health, setHealth] = useCachedState('live-engine-dashboard:health', null);
+  const [stats, setStats] = useCachedState('live-engine-dashboard:stats', []);
+  const [loadingHealth, setLoadingHealth] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const showHealthSkeleton = loadingHealth && !hasCached('live-engine-dashboard:health');
+  const showStatsSkeleton = loadingStats && !hasCached('live-engine-dashboard:stats');
+  const isRefreshingStats = loadingStats && !showStatsSkeleton;
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchData = async (isRefresh = false) => {
+  const fetchHealth = async (isRefresh) => {
+    if (!isRefresh) setLoadingHealth(true);
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      
-      const [healthRes, statsRes] = await Promise.all([
-        api.get('/live-engine/health'),
-        api.get('/live-engine/tokens/stats'),
-      ]);
-      setHealth(healthRes);
-      setStats(statsRes);
-    } catch (error) {
-      toast.error('Failed to fetch live engine data');
+      setHealth(await api.get('/live-engine/health'));
+    } catch {
+      toast.error('Failed to fetch live engine health');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setLoadingHealth(false);
     }
+  };
+
+  const fetchStats = async (isRefresh) => {
+    if (!isRefresh) setLoadingStats(true);
+    try {
+      setStats(await api.get('/live-engine/tokens/stats'));
+    } catch {
+      toast.error('Failed to fetch token stats');
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const fetchData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    await Promise.all([fetchHealth(isRefresh), fetchStats(isRefresh)]);
+    setRefreshing(false);
   };
 
   const handleRefresh = () => {
     fetchData(true);
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
 
   const healthyTokens = stats.filter((s) => s.is_healthy).length;
   const totalRequests = stats.reduce((sum, s) => sum + s.daily_requests, 0);
@@ -81,24 +89,28 @@ export default function LiveEngineDashboard() {
           label="Active Tokens"
           value={`${healthyTokens} / ${stats.length}`}
           color="blue"
+          loading={showStatsSkeleton}
         />
         <StatCard
           icon={Activity}
           label="Requests Today"
           value={totalRequests.toLocaleString()}
           color="green"
+          loading={showStatsSkeleton}
         />
         <StatCard
           icon={TrendingUp}
           label="Bandwidth (Month)"
           value={`${totalBandwidth.toFixed(1)} MB`}
           color="purple"
+          loading={showStatsSkeleton}
         />
         <StatCard
           icon={Database}
           label="Database"
           value={health?.database?.postgresql === 'connected' ? 'Connected' : 'Disconnected'}
           color={health?.database?.postgresql === 'connected' ? 'green' : 'red'}
+          loading={showHealthSkeleton}
         />
       </div>
 
@@ -109,9 +121,15 @@ export default function LiveEngineDashboard() {
             Collection Status
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CollectionStatus asset="Bitcoin" enabled={health?.collection?.bitcoin} />
-            <CollectionStatus asset="Gold" enabled={health?.collection?.gold} />
-            <CollectionStatus asset="Silver" enabled={health?.collection?.silver} />
+            {showHealthSkeleton ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[62px] rounded-lg" />)
+            ) : (
+              <>
+                <CollectionStatus asset="Bitcoin" enabled={health?.collection?.bitcoin} />
+                <CollectionStatus asset="Gold" enabled={health?.collection?.gold} />
+                <CollectionStatus asset="Silver" enabled={health?.collection?.silver} />
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -122,8 +140,10 @@ export default function LiveEngineDashboard() {
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
             Token Usage
           </h2>
-          <div className="space-y-4">
-            {stats.length === 0 ? (
+          <div className={`space-y-4 transition-opacity ${isRefreshingStats ? 'opacity-60' : ''}`}>
+            {showStatsSkeleton ? (
+              Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)
+            ) : stats.length === 0 ? (
               <p className="text-slate-500 dark:text-slate-400 text-center py-8">
                 No tokens configured
               </p>
@@ -137,7 +157,7 @@ export default function LiveEngineDashboard() {
   );
 }
 
-const StatCard = ({ icon: Icon, label, value, color }) => {
+const StatCard = ({ icon: Icon, label, value, color, loading = false }) => {
   const colors = {
     blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400',
     green: 'bg-green-50 text-green-600 dark:bg-green-900/40 dark:text-green-400',
@@ -154,7 +174,11 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
           </div>
           <div>
             <p className="text-sm text-slate-600 dark:text-slate-400">{label}</p>
-            <p className="text-xl font-bold text-slate-900 dark:text-white">{value}</p>
+            {loading ? (
+              <Skeleton className="h-6 w-20 mt-1" />
+            ) : (
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{value}</p>
+            )}
           </div>
         </div>
       </CardContent>

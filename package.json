@@ -12,6 +12,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-slot": "^1.2.4",
+    "@sentry/react": "11.9.0",
     "axios": "^1.15.1",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",

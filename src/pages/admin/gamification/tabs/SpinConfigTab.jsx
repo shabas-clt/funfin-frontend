@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, Save, Plus, Trash } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import { formatNumber } from '@/lib/format';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 // The tier editor stays fully controlled — easier than shoe-horning nested
 // arrays into react-hook-form, and we lean on the backend to reject invalid
@@ -141,16 +142,28 @@ function TierRow({ tier, onChange, onRemove, share }) {
 }
 
 export default function SpinConfigTab() {
-  const [dailyLimit, setDailyLimit] = useState(1);
-  const [maxExtraSpinsPerDay, setMaxExtraSpinsPerDay] = useState(1);
-  const [tiers, setTiers] = useState([]);
+  // The last config the server returned is cached, so reopening this tab
+  // fills the editor at once while it refreshes. The editor fields stay
+  // local: a refresh only fills them while the admin has not edited anything.
+  const [config, setConfig] = useCachedState('gamification-spin:config', null);
+  const [dailyLimit, setDailyLimit] = useState(config?.dailyLimit ?? 1);
+  const [maxExtraSpinsPerDay, setMaxExtraSpinsPerDay] = useState(config?.maxExtraSpinsPerDay ?? 1);
+  const [tiers, setTiers] = useState(config?.rewardTiers || []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const dirty = useRef(false);
+  const markDirty = () => {
+    dirty.current = true;
+  };
+  const showSkeleton = loading && !hasCached('gamification-spin:config');
+  const isRefreshing = loading && !showSkeleton;
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get('/admin/gamification/spin-config');
+      setConfig(res);
+      if (dirty.current) return;
       setDailyLimit(res.dailyLimit ?? 1);
       setMaxExtraSpinsPerDay(res.maxExtraSpinsPerDay ?? 1);
       setTiers(res.rewardTiers || []);
@@ -159,7 +172,7 @@ export default function SpinConfigTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setConfig]);
 
   useEffect(() => {
     load();
@@ -179,12 +192,15 @@ export default function SpinConfigTab() {
   };
 
   const updateTier = (idx, next) => {
+    markDirty();
     setTiers((prev) => prev.map((t, i) => (i === idx ? next : t)));
   };
   const removeTier = (idx) => {
+    markDirty();
     setTiers((prev) => prev.filter((_, i) => i !== idx));
   };
   const addTier = () => {
+    markDirty();
     setTiers((prev) => [
       ...prev,
       {
@@ -224,6 +240,8 @@ export default function SpinConfigTab() {
         })),
       };
       const res = await api.patch('/admin/gamification/spin-config', payload);
+      setConfig(res);
+      dirty.current = false;
       setDailyLimit(res.dailyLimit ?? 1);
       setMaxExtraSpinsPerDay(res.maxExtraSpinsPerDay ?? 1);
       setTiers(res.rewardTiers || []);
@@ -247,7 +265,10 @@ export default function SpinConfigTab() {
               type="number"
               min={1}
               value={dailyLimit}
-              onChange={(e) => setDailyLimit(Number(e.target.value) || 1)}
+              onChange={(e) => {
+                markDirty();
+                setDailyLimit(Number(e.target.value) || 1);
+              }}
               className="w-32 px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
             />
           </div>
@@ -259,7 +280,10 @@ export default function SpinConfigTab() {
               type="number"
               min={0}
               value={maxExtraSpinsPerDay}
-              onChange={(e) => setMaxExtraSpinsPerDay(Number(e.target.value) || 0)}
+              onChange={(e) => {
+                markDirty();
+                setMaxExtraSpinsPerDay(Number(e.target.value) || 0);
+              }}
               className="w-32 px-3 py-2 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
             />
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
@@ -315,22 +339,22 @@ export default function SpinConfigTab() {
                   <th className="px-3 py-2.5 font-medium" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {loading && (
+              <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton && (
                   <tr>
                     <td colSpan={10} className="px-4 py-6 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
                     </td>
                   </tr>
                 )}
-                {!loading && tiers.length === 0 && (
+                {!showSkeleton && tiers.length === 0 && (
                   <tr>
                     <td colSpan={10} className="px-4 py-6 text-center text-slate-500 text-sm">
                       No tiers configured. Add at least one.
                     </td>
                   </tr>
                 )}
-                {!loading &&
+                {!showSkeleton &&
                   tiers.map((tier, idx) => (
                     <TierRow
                       key={idx}

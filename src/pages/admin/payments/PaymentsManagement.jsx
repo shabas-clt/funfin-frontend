@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCachedState } from '@/lib/pageCache';
 import { BarChart3, Receipt, UserSearch, AlertTriangle, ScrollText, Store } from 'lucide-react';
 import OverviewTab from './tabs/OverviewTab';
 import PurchasesTab from './tabs/PurchasesTab';
@@ -21,8 +21,10 @@ const TABS = [
 ];
 
 export default function PaymentsManagement() {
-  const [tab, setTab] = useState('overview');
-  const [userId, setUserId] = useState(null);
+  // Tab and the opened customer are cached, so coming back to Payments
+  // reopens the same tab.
+  const [tab, setTab] = useCachedState('payments:tab', 'overview');
+  const [userId, setUserId] = useCachedState('payments:userId', null);
 
   const openUser = (id) => {
     setUserId(id);

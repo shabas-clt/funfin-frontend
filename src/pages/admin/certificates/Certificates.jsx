@@ -9,19 +9,29 @@ import CertificateFilters from '../../../components/admin/certificates/Certifica
 import CertificateDetailsModal from '../../../components/admin/certificates/CertificateDetailsModal';
 import DeleteCertificateDialog from '../../../components/admin/certificates/DeleteCertificateDialog';
 import CertificateSignaturesModal from '../../../components/admin/certificates/CertificateSignaturesModal';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 export default function Certificates() {
   const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [certificates, setCertificates] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [certificates, setCertificates] = useCachedState('certificates:rows', []);
+  const [total, setTotal] = useCachedState('certificates:total', 0);
+  const [page, setPage] = useCachedState('certificates:page', 1);
+  const [filters, setFilters] = useCachedState('certificates:filters', {
     q: '',
     revoked: '',
     sort_by: 'issuedAt',
     order: 'desc',
   });
+  const debouncedQ = useDebouncedValue(filters.q);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = loading && !hasCached('certificates:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const request = useLatestRequest();
   const [selected, setSelected] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [toDelete, setToDelete] = useState(null);
@@ -32,34 +42,37 @@ export default function Certificates() {
 
   const loadCertificates = async (isRefresh = false) => {
     if (!isAuthenticated) return;
+    const id = request.begin();
     if (!isRefresh) setLoading(true);
 
     try {
       const params = {
         skip: (page - 1) * limit,
         limit,
-        ...(filters.q && { q: filters.q }),
+        ...(debouncedQ && { q: debouncedQ }),
         ...(filters.revoked !== '' && { revoked: filters.revoked }),
         sort_by: filters.sort_by,
         order: filters.order,
       };
 
       const data = await certificatesApi.list(params);
+      if (!request.isLatest(id)) return;
       setCertificates(data.items || []);
       setTotal(data.total || 0);
     } catch (error) {
+      if (!request.isLatest(id)) return;
       const message = typeof error === 'string' ? error : 'Failed to load certificates';
       toast.error(message);
       console.error('Certificates fetch error:', error);
     } finally {
-      setLoading(false);
+      if (request.isLatest(id)) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadCertificates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, page, filters]);
+  }, [isAuthenticated, page, debouncedQ, filters.revoked, filters.sort_by, filters.order]);
 
   const handleRefresh = () => loadCertificates(true);
 
@@ -121,7 +134,7 @@ export default function Certificates() {
 
       <CertificateFilters filters={filters} setFilters={setFilters} setPage={setPage} />
 
-      {loading ? (
+      {showSkeleton ? (
         <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
           <div className="space-y-4">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -141,7 +154,7 @@ export default function Certificates() {
           <p className="text-slate-400 dark:text-slate-500">No certificates found</p>
         </div>
       ) : (
-        <>
+        <div className={`space-y-5 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <CertificatesTable
             certificates={certificates}
             onViewDetails={handleViewDetails}
@@ -156,7 +169,7 @@ export default function Certificates() {
               <div className="flex items-center justify-center gap-4">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
+                  disabled={page === 1 || loading}
                   className="px-4 py-2 bg-slate-100 dark:bg-neutral-900 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors text-sm font-medium"
                 >
                   Previous
@@ -166,7 +179,7 @@ export default function Certificates() {
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
+                  disabled={page === totalPages || loading}
                   className="px-4 py-2 bg-slate-100 dark:bg-neutral-900 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors text-sm font-medium"
                 >
                   Next
@@ -174,7 +187,7 @@ export default function Certificates() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {showDetails && selected && (

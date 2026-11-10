@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef , Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/shared/Sidebar';
 import Header from '../components/shared/Header';
+import PageFallback from '../components/shared/PageFallback';
 
 const AdminLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -25,7 +26,9 @@ const AdminLayout = () => {
         <Header setIsSidebarOpen={setIsSidebarOpen} />
 
         <main ref={mainRef} className="flex-1 overflow-y-auto w-full p-4 md:p-6">
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { Loader2, Plus, Save, Edit2, X, Trash2, Zap, Award, Crown } from 'lucide
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 const OPERATORS = [
   { value: '==', label: 'Equal to (==)' },
@@ -456,12 +457,17 @@ function RuleCard({ rule, onEdit, onDelete }) {
 }
 
 export default function AchievementRulesTab() {
-  const [rules, setRules] = useState([]);
-  const [badges, setBadges] = useState([]);
-  const [titles, setTitles] = useState([]);
-  const [metrics, setMetrics] = useState([]);
+  // Cached so reopening this tab shows the last rules at once while they
+  // refresh. The four calls stay together: the create and edit forms need
+  // badges, titles and metrics to build their options.
+  const [rules, setRules] = useCachedState('gamification-rules:rows', []);
+  const [badges, setBadges] = useCachedState('gamification-rules:badges', []);
+  const [titles, setTitles] = useCachedState('gamification-rules:titles', []);
+  const [metrics, setMetrics] = useCachedState('gamification-rules:metrics', []);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const showSkeleton = loading && !hasCached('gamification-rules:rows');
+  const isRefreshing = loading && !showSkeleton;
 
   const load = useCallback(async () => {
     try {
@@ -481,13 +487,13 @@ export default function AchievementRulesTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setRules, setBadges, setTitles, setMetrics]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  if (loading) {
+  if (showSkeleton) {
     return (
       <div className="p-8 text-center text-sm text-slate-500">
         <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Loading achievement rules…
@@ -519,14 +525,14 @@ export default function AchievementRulesTab() {
       />
 
       {rules.length === 0 ? (
-        <Card className="bg-white dark:bg-black border border-slate-100 dark:border-neutral-800">
+        <Card className={`bg-white dark:bg-black border border-slate-100 dark:border-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <CardContent className="p-8 text-center text-sm text-slate-500">
             <Zap className="w-8 h-8 inline mb-2 opacity-50" />
             <p>No achievement rules yet. Create one above to get started.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           {rules.map((rule) =>
             editingId === rule.id ? (
               <EditCard

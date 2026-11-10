@@ -7,13 +7,19 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import './index.css';
 import App from './App.jsx';
+import { initSentry, Sentry } from './lib/sentry';
+import CrashFallback from './components/shared/CrashFallback';
+
+initSentry();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
-          <App />
+          <Sentry.ErrorBoundary fallback={<CrashFallback />}>
+            <App />
+          </Sentry.ErrorBoundary>
           <ToastContainer
             position="top-right"
             autoClose={3500}

@@ -6,6 +6,8 @@ import { FilterDropdown } from '@/components/ui/filter-dropdown';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import { formatShortDate } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 const FILTER_OPTIONS = ['All', 'pending', 'completed', 'expired'];
 const PAGE_SIZE = 20;
@@ -18,15 +20,25 @@ const SORT_OPTIONS = [
 ];
 
 export default function ReferralRecords() {
-  const [records, setRecords] = useState([]);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [records, setRecords] = useCachedState('referral-records:rows', []);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt-desc');
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useCachedState('referral-records:search', '');
+  const debouncedSearch = useDebouncedValue(searchQuery);
+  const [filterStatus, setFilterStatus] = useCachedState('referral-records:status', '');
+  const [sortBy, setSortBy] = useCachedState('referral-records:sort', 'createdAt-desc');
+  const [skip, setSkip] = useCachedState('referral-records:skip', 0);
+  const [total, setTotal] = useCachedState('referral-records:total', 0);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached('referral-records:rows');
+  const isRefreshing = isLoading && !showSkeleton;
+  const request = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const fetchRecords = async (nextSkip = skip) => {
+    const id = request.begin();
     try {
       setIsLoading(true);
       const [sortField, sortOrder] = sortBy.split('-');
@@ -35,28 +47,33 @@ export default function ReferralRecords() {
         params: {
           skip: nextSkip,
           limit: PAGE_SIZE,
-          search: searchQuery || undefined,
+          search: debouncedSearch || undefined,
           status: filterStatus && filterStatus !== 'All' ? filterStatus : undefined,
           sortBy: sortField,
           sortOrder: sortOrder,
         },
       });
+      if (!request.isLatest(id)) return;
       
       setRecords(res.records || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch (error) {
+      if (!request.isLatest(id)) return;
       setRecords([]);
       setTotal(0);
       toast.error(typeof error === 'string' ? error : 'Failed to load referral records');
     } finally {
-      setIsLoading(false);
+      if (request.isLatest(id)) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRecords(0);
-  }, [searchQuery, filterStatus, sortBy]);
+    // On open, refresh the page the admin was on; after a filter or search
+    // change, go back to the first page.
+    fetchRecords(restorePage(skip, [debouncedSearch, filterStatus, sortBy]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filterStatus, sortBy]);
 
   const getStatusBadge = (status) => {
     const statusMap = {
@@ -165,8 +182,8 @@ export default function ReferralRecords() {
           </div>
 
           {/* Mobile View */}
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="h-24 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -221,8 +238,8 @@ export default function ReferralRecords() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={8} cols={6} />
                 ) : records.length === 0 ? (
                   <tr>
@@ -279,7 +296,7 @@ export default function ReferralRecords() {
           </div>
 
           {/* Pagination */}
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -287,7 +304,7 @@ export default function ReferralRecords() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => fetchRecords(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -298,7 +315,7 @@ export default function ReferralRecords() {
                 </span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => fetchRecords(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

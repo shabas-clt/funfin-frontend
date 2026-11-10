@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Coins, List, ArrowRightLeft, ShoppingBag, Package } from 'lucide-react';
+import { useCachedState } from '@/lib/pageCache';
 import PricingTab from './tabs/PricingTab';
 import CategoriesTab from './tabs/CategoriesTab';
 import TransactionsTab from './tabs/TransactionsTab';
@@ -20,7 +20,8 @@ const TABS = [
 ];
 
 export default function FuncoinManagement() {
-  const [tab, setTab] = useState('pricing');
+  // Cached so coming back to this page reopens the tab the admin was on.
+  const [tab, setTab] = useCachedState('funcoin:tab', 'pricing');
 
   return (
     <div className="space-y-5">

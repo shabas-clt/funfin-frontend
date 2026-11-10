@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { paymentsApi, errorText } from '@/api/paymentsApi';
 import { formatInr, formatNumber, formatUsd } from '@/lib/format';
 import { CHANNEL_LABELS, KIND_LABELS, refundReasonLabel, selectClass } from '@/components/admin/payments/badges';
+import { useCachedState, useLatestRequest } from '@/lib/pageCache';
 
 const RANGES = [7, 30, 90, 365];
 
@@ -60,20 +61,29 @@ function Breakdown({ title, rows, labels }) {
 }
 
 export default function OverviewTab({ onGoTo }) {
-  const [days, setDays] = useState(30);
-  const [data, setData] = useState(null);
+  // Cached so coming back to this tab shows the last numbers at once while
+  // they refresh.
+  const [days, setDays] = useCachedState('payments-overview:days', 30);
+  const [data, setData] = useCachedState('payments-overview:data', null);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = loading && !data;
+  const isRefreshing = loading && !showSkeleton;
+  const { begin: beginRequest, isLatest } = useLatestRequest();
 
   const load = useCallback(async () => {
+    const id = beginRequest();
     setLoading(true);
     try {
-      setData(await paymentsApi.overview(days));
+      const res = await paymentsApi.overview(days);
+      if (!isLatest(id)) return;
+      setData(res);
     } catch (err) {
+      if (!isLatest(id)) return;
       toast.error(errorText(err, 'Failed to load overview'));
     } finally {
-      setLoading(false);
+      if (isLatest(id)) setLoading(false);
     }
-  }, [days]);
+  }, [days, beginRequest, isLatest, setData]);
 
   useEffect(() => {
     load();
@@ -94,13 +104,13 @@ export default function OverviewTab({ onGoTo }) {
         </select>
       </div>
 
-      {loading || !data ? (
+      {showSkeleton || !data ? (
         <div className="py-12 text-center text-slate-500 text-sm">
           <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
           Loading…
         </div>
       ) : (
-        <>
+        <div className={`space-y-4 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Stat label="Gross sales" value={formatUsd(data.grossUsd)} hint="Before store and card fees" />
             <Stat
@@ -163,7 +173,7 @@ export default function OverviewTab({ onGoTo }) {
               </CardContent>
             </Card>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

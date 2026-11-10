@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import Cookies from 'js-cookie';
 import { api } from '@/api/axios';
+import { clearPageCache } from '@/lib/pageCache';
+import { setSentryAdmin } from '@/lib/sentry';
 
 const AuthContext = createContext(null);
 
@@ -9,17 +11,37 @@ const PROFILE_KEY = 'ff_admin_profile';
 const AUTH_EXPIRED_EVENT = 'ff-auth-expired';
 const AUTH_FORBIDDEN_EVENT = 'ff-auth-forbidden';
 
+// Profile saved by the last check in this tab. With a token cookie present it
+// lets the panel render at once on reload; the server check below still runs
+// and logs out if the token or role is no longer valid.
+const readCachedProfile = () => {
+  if (!Cookies.get(COOKIE_KEY)) return null;
+  try {
+    const raw = sessionStorage.getItem(PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
+  const [cachedProfile] = useState(readCachedProfile);
   // null = still checking, false = unauthenticated, true = authenticated
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
-  const [admin, setAdmin] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(cachedProfile ? true : null);
+  const [admin, setAdmin] = useState(cachedProfile);
 
   const logout = useCallback(() => {
+    clearPageCache();
     Cookies.remove(COOKIE_KEY);
     sessionStorage.removeItem(PROFILE_KEY);
     setIsAuthenticated(false);
     setAdmin(null);
   }, []);
+
+  // Tag error reports with the signed-in admin (id and role only).
+  useEffect(() => {
+    setSentryAdmin(admin);
+  }, [admin]);
 
   useEffect(() => {
     const hydrateSession = async () => {
@@ -72,6 +94,7 @@ export const AuthProvider = ({ children }) => {
   }, [logout]);
 
   const login = (token, adminProfile) => {
+    clearPageCache();
     // SameSite=Strict blocks CSRF; Secure ensures HTTPS-only in prod.
     // Not HttpOnly because JS must read it for Bearer auth headers — backend should
     // ideally set the cookie directly to get true HttpOnly protection.

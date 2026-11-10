@@ -7,6 +7,7 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import FieldError from '@/components/shared/FieldError';
 import { titleCreateSchema } from '@/lib/validation/schemas';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 function CreateForm({ onCreated }) {
   const {
@@ -164,10 +165,14 @@ function EditRow({ title, onSaved, onCancel }) {
 }
 
 export default function TitlesTab() {
-  const [rows, setRows] = useState([]);
+  // Cached so reopening this tab shows the last list at once while it
+  // refreshes in the background.
+  const [rows, setRows] = useCachedState('gamification-titles:rows', []);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useCachedState('gamification-titles:search', '');
+  const showSkeleton = loading && !hasCached('gamification-titles:rows');
+  const isRefreshing = loading && !showSkeleton;
 
   const load = useCallback(async () => {
     try {
@@ -179,7 +184,7 @@ export default function TitlesTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setRows]);
 
   useEffect(() => {
     load();
@@ -222,22 +227,22 @@ export default function TitlesTab() {
                 <th className="px-3 py-2.5 font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-              {loading && (
+            <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+              {showSkeleton && (
                 <tr>
                   <td colSpan={5} className="px-3 py-8 text-center text-slate-500 text-sm">
                     <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
                   </td>
                 </tr>
               )}
-              {!loading && filteredRows.length === 0 && (
+              {!showSkeleton && filteredRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-8 text-center text-slate-500 text-sm">
                     <Crown className="w-5 h-5 inline mr-1 opacity-50" /> No titles yet.
                   </td>
                 </tr>
               )}
-              {!loading &&
+              {!showSkeleton &&
                 filteredRows.map((title) =>
                   editingId === title.id ? (
                     <EditRow

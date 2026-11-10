@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 const EMPTY = {
   name: '',
@@ -146,11 +147,15 @@ function PackForm({ initial, pack, submitting, onSubmit, onCancel, mode }) {
 }
 
 export default function PacksTab() {
-  const [rows, setRows] = useState([]);
+  // Cached so reopening this tab shows the last list at once while it
+  // refreshes in the background.
+  const [rows, setRows] = useCachedState('funcoin-packs:rows', []);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [created, setCreated] = useState(null);
+  const showSkeleton = loading && !hasCached('funcoin-packs:rows');
+  const isRefreshing = loading && !showSkeleton;
 
   const load = useCallback(async () => {
     try {
@@ -162,7 +167,7 @@ export default function PacksTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setRows]);
 
   useEffect(() => {
     load();
@@ -251,14 +256,14 @@ export default function PacksTab() {
                 <th className="px-3 py-2.5 font-medium text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-              {loading && (
+            <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+              {showSkeleton && (
                 <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500 text-sm"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
               )}
-              {!loading && rows.length === 0 && (
+              {!showSkeleton && rows.length === 0 && (
                 <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500 text-sm">No coin packs yet.</td></tr>
               )}
-              {!loading && rows.map((row) => (
+              {!showSkeleton && rows.map((row) => (
                 editingId === row.id ? (
                   <tr key={row.id} className="bg-indigo-50/40 dark:bg-indigo-950/20">
                     <td colSpan={8} className="px-3 py-3">

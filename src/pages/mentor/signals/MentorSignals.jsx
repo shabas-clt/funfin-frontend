@@ -14,6 +14,7 @@ import Swal from 'sweetalert2';
 import { signalCreateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
 import { formatShortDateTime } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
 
 const PAGE_SIZE = 12;
 const STATUS_OPTIONS = [
@@ -83,21 +84,30 @@ export default function MentorSignals() {
   const role = admin?.role;
   const isSuperadmin = role === 'superadmin';
 
-  const [signals, setSignals] = useState([]);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [signals, setSignals] = useCachedState('mentor-signals:rows', []);
   const [isLoading, setIsLoading] = useState(true);
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [skip, setSkip] = useCachedState('mentor-signals:skip', 0);
+  const [total, setTotal] = useCachedState('mentor-signals:total', 0);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [mentorFilter, setMentorFilter] = useState('');
-  const [ownerScope, setOwnerScope] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  // Search runs on submit (Enter), not per keystroke, so it needs no debounce.
+  const [searchQuery, setSearchQuery] = useCachedState('mentor-signals:search', '');
+  const [statusFilter, setStatusFilter] = useCachedState('mentor-signals:status', '');
+  const [mentorFilter, setMentorFilter] = useCachedState('mentor-signals:mentor', '');
+  const [ownerScope, setOwnerScope] = useCachedState('mentor-signals:ownerScope', 'all');
+  const [startDate, setStartDate] = useCachedState('mentor-signals:startDate', '');
+  const [endDate, setEndDate] = useCachedState('mentor-signals:endDate', '');
+  const [sortBy, setSortBy] = useCachedState('mentor-signals:sortBy', 'createdAt');
+  const [sortOrder, setSortOrder] = useCachedState('mentor-signals:sortOrder', 'desc');
 
-  const [mentorOptions, setMentorOptions] = useState([]);
+  const [mentorOptions, setMentorOptions] = useCachedState('mentor-signals:mentorOptions', []);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached('mentor-signals:rows');
+  const isRefreshing = isLoading && !showSkeleton;
+  const request = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSignal, setEditingSignal] = useState(null);
@@ -140,6 +150,7 @@ export default function MentorSignals() {
   };
 
   const loadSignals = async (nextSkip = 0) => {
+    const id = request.begin();
     try {
       setIsLoading(true);
       const params = {
@@ -161,24 +172,30 @@ export default function MentorSignals() {
       }
 
       const res = await api.get('/mentor/signals', { params });
+      if (!request.isLatest(id)) return;
       setSignals(res.signals || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch (err) {
+      if (!request.isLatest(id)) return;
       setSignals([]);
       setTotal(0);
       toast.error(typeof err === 'string' ? err : 'Failed to load signals');
     } finally {
-      setIsLoading(false);
+      if (request.isLatest(id)) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSignals(0);
+    // On open, refresh the page the admin was on; after a filter change, go
+    // back to the first page.
+    loadSignals(restorePage(skip, [statusFilter, mentorFilter, ownerScope, startDate, endDate, sortBy, sortOrder]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, mentorFilter, ownerScope, startDate, endDate, sortBy, sortOrder]);
 
   useEffect(() => {
     loadMentorOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperadmin]);
 
   const onSearch = (event) => {
@@ -393,8 +410,8 @@ export default function MentorSignals() {
             </div>
           </div>
 
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-32 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -449,8 +466,8 @@ export default function MentorSignals() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={6} cols={8} />
                 ) : signals.length === 0 ? (
                   <tr>
@@ -498,7 +515,7 @@ export default function MentorSignals() {
             </table>
           </div>
 
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -506,7 +523,7 @@ export default function MentorSignals() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => loadSignals(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -515,7 +532,7 @@ export default function MentorSignals() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">{currentPage} / {totalPages}</span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => loadSignals(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

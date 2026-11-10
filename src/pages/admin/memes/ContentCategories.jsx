@@ -8,13 +8,18 @@ import { useAuth } from '../../../context/AuthContext';
 import CategoriesTable from '../../../components/admin/memes/CategoriesTable';
 import AddCategoryDialog from '../../../components/admin/memes/AddCategoryDialog';
 import EditCategoryDialog from '../../../components/admin/memes/EditCategoryDialog';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 export default function ContentCategories() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState([]);
+  // Cached, so coming back to this page shows the last list at once and
+  // refreshes it in the background.
+  const [categories, setCategories] = useCachedState('meme-content-categories:rows', []);
+  const showSkeleton = loading && !hasCached('meme-content-categories:rows');
+  const isRefreshing = loading && !showSkeleton;
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [categoryToEdit, setCategoryToEdit] = useState(null);
@@ -37,6 +42,7 @@ export default function ContentCategories() {
 
   useEffect(() => {
     loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   const handleAdd = async (formData) => {
@@ -151,7 +157,7 @@ export default function ContentCategories() {
         </div>
       </div>
 
-      {loading ? (
+      {showSkeleton ? (
         <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -167,12 +173,14 @@ export default function ContentCategories() {
           </div>
         </div>
       ) : (
-        <CategoriesTable
-          categories={categories}
-          onDelete={handleDelete}
-          onEdit={handleEdit}
-          onToggleActive={handleToggleActive}
-        />
+        <div className={`transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+          <CategoriesTable
+            categories={categories}
+            onDelete={handleDelete}
+            onEdit={handleEdit}
+            onToggleActive={handleToggleActive}
+          />
+        </div>
       )}
 
       {showAddDialog && (

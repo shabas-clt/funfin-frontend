@@ -22,12 +22,17 @@ function probeVideoMetadata(file) {
   });
 }
 
+// Matches the backend (_VIDEO_SIZE_LIMIT) and nginx client_max_body_size on
+// admin-api. Change all three together.
+const DEFAULT_MAX_MB = 1024;
+const formatLimit = (mb) => (mb >= 1024 ? `${+(mb / 1024).toFixed(1)} GB` : `${mb} MB`);
+
 export default function VideoUploader({
   value,
   durationSec = 0,
   onChange,
   label = 'Video',
-  maxMb = 500,
+  maxMb = DEFAULT_MAX_MB,
 }) {
   const inputRef = useRef(null);
   const [progress, setProgress] = useState(0);
@@ -49,7 +54,7 @@ export default function VideoUploader({
     event.target.value = '';
     if (!file) return;
     if (file.size > maxMb * 1024 * 1024) {
-      toast.error(`File too large (max ${maxMb} MB)`);
+      toast.error(`File too large (max ${formatLimit(maxMb)})`);
       return;
     }
 
@@ -121,7 +126,7 @@ export default function VideoUploader({
             <>
               <UploadCloud className="w-6 h-6 mb-2" />
               <span>Click to upload video</span>
-              <span className="text-xs text-slate-400 mt-1">MP4 / WEBM / MOV up to {maxMb} MB</span>
+              <span className="text-xs text-slate-400 mt-1">MP4 / WEBM / MOV up to {formatLimit(maxMb)}</span>
             </>
           )}
         </button>

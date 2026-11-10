@@ -1,25 +1,32 @@
 import { useEffect, useState } from 'react';
 import { Search, Filter, RefreshCw, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { simulationApi, US_STOCK_LIST, INDIAN_STOCK_LIST, UK_STOCK_LIST, TRADE_STATUS } from '../../../api/simulationApi';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 // Combined stock list
 const ALL_STOCKS = [...US_STOCK_LIST, ...INDIAN_STOCK_LIST, ...UK_STOCK_LIST];
 
 const SimulationTrades = () => {
-  const [trades, setTrades] = useState([]);
-  const [total, setTotal] = useState(0);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [trades, setTrades] = useCachedState('simulation-trades:rows', []);
+  const [total, setTotal] = useCachedState('simulation-trades:total', 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useCachedState('simulation-trades:page', 1);
   const [limit] = useState(20);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useCachedState('simulation-trades:filters', {
     status: '',
     stock: '',
     user_id: '',
   });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useCachedState('simulation-trades:search', '');
+  const showSkeleton = loading && !hasCached('simulation-trades:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const request = useLatestRequest();
 
   const loadTrades = async () => {
+    const id = request.begin();
     setLoading(true);
     setError('');
     try {
@@ -32,13 +39,15 @@ const SimulationTrades = () => {
       if (filters.user_id) params.user_id = filters.user_id;
 
       const data = await simulationApi.getTrades(params);
+      if (!request.isLatest(id)) return;
       setTrades(data.trades || []);
       setTotal(data.total || 0);
     } catch (err) {
+      if (!request.isLatest(id)) return;
       console.error('Error loading trades:', err);
       setError(typeof err === 'string' ? err : 'Failed to load trades');
     } finally {
-      setLoading(false);
+      if (request.isLatest(id)) setLoading(false);
     }
   };
 
@@ -210,8 +219,8 @@ const SimulationTrades = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
-              {loading ? (
+            <tbody className={`divide-y divide-slate-200 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+              {showSkeleton ? (
                 <tr>
                   <td colSpan="11" className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                     Loading trades...
