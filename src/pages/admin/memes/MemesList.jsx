@@ -9,21 +9,31 @@ import MemesTable from '../../../components/admin/memes/MemesTable';
 import MemeFilters from '../../../components/admin/memes/MemeFilters';
 import MemeDetailsModal from '../../../components/admin/memes/MemeDetailsModal';
 import DeleteMemeDialog from '../../../components/admin/memes/DeleteMemeDialog';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 export default function MemesList() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [memes, setMemes] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [memes, setMemes] = useCachedState('memes:rows', []);
+  const [total, setTotal] = useCachedState('memes:total', 0);
+  const [page, setPage] = useCachedState('memes:page', 1);
+  const [filters, setFilters] = useCachedState('memes:filters', {
     category: '',
     postingCategory: '',
     search: '',
     sortBy: 'latest'
   });
+  const debouncedSearch = useDebouncedValue(filters.search);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = loading && !hasCached('memes:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const request = useLatestRequest();
   const [selectedMeme, setSelectedMeme] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -33,6 +43,7 @@ export default function MemesList() {
 
   const loadMemes = async (isRefresh = false) => {
     if (!isAuthenticated) return;
+    const id = request.begin();
     if (!isRefresh) setLoading(true);
 
     try {
@@ -41,25 +52,28 @@ export default function MemesList() {
         limit,
         ...(filters.category && { category: filters.category }),
         ...(filters.postingCategory && { postingCategory: filters.postingCategory }),
-        ...(filters.search && { userId: filters.search }),
+        ...(debouncedSearch && { userId: debouncedSearch }),
         sortBy: filters.sortBy
       };
 
       const data = await api.get('/admin/memes', { params });
+      if (!request.isLatest(id)) return;
       setMemes(data.memes || []);
       setTotal(data.total || 0);
     } catch (error) {
+      if (!request.isLatest(id)) return;
       const message = typeof error === 'string' ? error : 'Failed to load memes';
       toast.error(message);
       console.error('Memes fetch error:', error);
     } finally {
-      setLoading(false);
+      if (request.isLatest(id)) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadMemes();
-  }, [isAuthenticated, page, filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, page, filters.category, filters.postingCategory, debouncedSearch, filters.sortBy]);
 
   const handleRefresh = () => {
     loadMemes(true);
@@ -143,7 +157,7 @@ export default function MemesList() {
 
       <MemeFilters filters={filters} setFilters={setFilters} setPage={setPage} />
 
-      {loading ? (
+      {showSkeleton ? (
         <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6">
           <div className="space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -163,7 +177,7 @@ export default function MemesList() {
           <p className="text-slate-400 dark:text-slate-500">No memes found</p>
         </div>
       ) : (
-        <>
+        <div className={`transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <MemesTable
             memes={memes}
             onViewDetails={handleViewDetails}
@@ -174,7 +188,7 @@ export default function MemesList() {
             <div className="flex items-center justify-center gap-4 mt-6">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
+                disabled={page === 1 || loading}
                 className="px-4 py-2 bg-slate-100 dark:bg-neutral-900 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors text-sm font-medium"
               >
                 Previous
@@ -184,14 +198,14 @@ export default function MemesList() {
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                disabled={page === totalPages || loading}
                 className="px-4 py-2 bg-slate-100 dark:bg-neutral-900 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors text-sm font-medium"
               >
                 Next
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {showDetailsModal && selectedMeme && (

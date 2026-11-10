@@ -17,6 +17,7 @@ import Swal from 'sweetalert2';
 import FieldError from '@/components/shared/FieldError';
 import { couponCreateSchema, couponUpdateSchema } from '@/lib/validation/schemas';
 import { formatInr, formatUsd, formatShortDate } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 const PAGE_SIZE = 20;
 
@@ -562,31 +563,43 @@ function EditDialog({ coupon, onSaved, onCancel }) {
 }
 
 export default function CouponManagement() {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // List, page and search are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [rows, setRows] = useCachedState('coupons:rows', []);
+  const [total, setTotal] = useCachedState('coupons:total', 0);
+  const [skip, setSkip] = useCachedState('coupons:skip', 0);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useCachedState('coupons:search', '');
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = loading && !hasCached('coupons:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const { begin: beginRequest, isLatest: isLatestRequest } = useLatestRequest();
 
   const load = useCallback(async (nextSkip = 0) => {
+    const id = beginRequest();
     try {
       setLoading(true);
       const res = await api.get('/course-coupons', {
         params: { skip: nextSkip, limit: PAGE_SIZE },
       });
+      if (!isLatestRequest(id)) return;
       setRows(res.coupons || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!isLatestRequest(id)) return;
       toast.error('Failed to load coupons');
     } finally {
-      setLoading(false);
+      if (isLatestRequest(id)) setLoading(false);
     }
-  }, []);
+  }, [beginRequest, isLatestRequest, setRows, setTotal, setSkip]);
 
   useEffect(() => {
-    load(0);
+    // On open, refresh the page the admin was on.
+    load(skip);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   const filtered = useMemo(() => {
@@ -665,8 +678,8 @@ export default function CouponManagement() {
                   <th className="px-4 py-2.5 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {loading && (
+              <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
@@ -674,7 +687,7 @@ export default function CouponManagement() {
                     </td>
                   </tr>
                 )}
-                {!loading && filtered.length === 0 && (
+                {!showSkeleton && filtered.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
                       <Tag className="w-5 h-5 inline mr-1 opacity-50" />
@@ -682,7 +695,7 @@ export default function CouponManagement() {
                     </td>
                   </tr>
                 )}
-                {!loading &&
+                {!showSkeleton &&
                   filtered.map((row) => (
                     <tr key={row.code} className="hover:bg-slate-50 dark:hover:bg-neutral-900/60">
                       <td className="px-4 py-2.5 font-mono text-xs">{row.code}</td>

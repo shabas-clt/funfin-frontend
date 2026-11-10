@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import FieldError from '@/components/shared/FieldError';
 import { missionCreateSchema } from '@/lib/validation/schemas';
 import { formatNumber } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 const MISSION_TYPES = ['daily', 'weekly', 'special'];
 
@@ -257,25 +258,34 @@ function EditRow({ mission, onSaved, onCancel }) {
 }
 
 export default function MissionsTab() {
-  const [rows, setRows] = useState([]);
+  // List and filters are cached so reopening this tab shows the last list at
+  // once while it refreshes in the background.
+  const [rows, setRows] = useCachedState('gamification-missions:rows', []);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useCachedState('gamification-missions:type', '');
   const [editingId, setEditingId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useCachedState('gamification-missions:search', '');
+  const showSkeleton = loading && !hasCached('gamification-missions:rows');
+  const isRefreshing = loading && !showSkeleton;
+  // Stable functions; a slower response for an older filter is dropped.
+  const { begin, isLatest } = useLatestRequest();
 
   const load = useCallback(async () => {
+    const id = begin();
     try {
       setLoading(true);
       const params = {};
       if (filter) params.missionType = filter;
       const res = await api.get('/admin/gamification/missions', { params });
+      if (!isLatest(id)) return;
       setRows(res.missions || []);
     } catch {
+      if (!isLatest(id)) return;
       toast.error('Failed to load missions');
     } finally {
-      setLoading(false);
+      if (isLatest(id)) setLoading(false);
     }
-  }, [filter]);
+  }, [filter, begin, isLatest, setRows]);
 
   useEffect(() => {
     load();
@@ -339,22 +349,22 @@ export default function MissionsTab() {
                   <th className="px-3 py-2.5 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {loading && (
+              <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton && (
                   <tr>
                     <td colSpan={7} className="px-3 py-8 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
                     </td>
                   </tr>
                 )}
-                {!loading && filteredRows.length === 0 && (
+                {!showSkeleton && filteredRows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-3 py-8 text-center text-slate-500 text-sm">
                       No missions.
                     </td>
                   </tr>
                 )}
-                {!loading &&
+                {!showSkeleton &&
                   filteredRows.map((mission) =>
                     editingId === mission.id ? (
                       <EditRow

@@ -13,6 +13,7 @@ import { api } from '@/api/axios';
 import { useTheme } from '@/context/ThemeContext';
 import { toast } from 'react-toastify';
 import { formatShortDateTime, formatChartDay } from '@/lib/format';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement, BarElement,
@@ -33,35 +34,77 @@ const StatCardSkeleton = () => (
 );
 
 export default function MentorDashboard() {
-  const [summary, setSummary] = useState(null);
-  const [signals, setSignals] = useState([]);
-  const [subscribers, setSubscribers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Cached so coming back to the dashboard shows the last data at once while
+  // it refreshes. Each section loads on its own and shows as soon as its own
+  // request returns.
+  const [summary, setSummary] = useCachedState('mentor-dashboard:summary', null);
+  const [signals, setSignals] = useCachedState('mentor-dashboard:signals', []);
+  const [subscribers, setSubscribers] = useCachedState('mentor-dashboard:subscribers', []);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(true);
+  const [isLoadingSignals, setIsLoadingSignals] = useState(true);
+  const [isLoadingSubscribers, setIsLoadingSubscribers] = useState(true);
+  const showSummarySkeleton = isLoadingSummary && !summary;
+  const showSignalsSkeleton = isLoadingSignals && !hasCached('mentor-dashboard:signals');
+  const showSubscribersSkeleton = isLoadingSubscribers && !hasCached('mentor-dashboard:subscribers');
   const { theme } = useTheme();
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setIsLoading(true);
-        const today = new Date().toISOString().slice(0, 10);
-        const [summaryRes, signalsRes, subscribersRes] = await Promise.all([
-          api.get('/mentor/dashboard/summary', { params: { days: 14 } }),
-          api.get('/mentor/signals', { params: { date: today, limit: 100 } }),
-          api.get('/mentor/subscribers', { params: { limit: 8 } }),
-        ]);
-
-        setSummary(summaryRes);
-        setSignals(signalsRes.signals || []);
-        setSubscribers(subscribersRes.students || []);
-      } catch {
-        toast.error('Failed to load mentor dashboard data');
-      } finally {
-        setIsLoading(false);
-      }
+    let cancelled = false;
+    setIsLoadingSummary(true);
+    api
+      .get('/mentor/dashboard/summary', { params: { days: 14 } })
+      .then((res) => {
+        if (!cancelled) setSummary(res);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Failed to load mentor dashboard summary');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSummary(false);
+      });
+    return () => {
+      cancelled = true;
     };
+  }, [setSummary]);
 
-    load();
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingSignals(true);
+    const today = new Date().toISOString().slice(0, 10);
+    api
+      .get('/mentor/signals', { params: { date: today, limit: 100 } })
+      .then((res) => {
+        if (!cancelled) setSignals(res.signals || []);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Failed to load today's signals");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSignals(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setSignals]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingSubscribers(true);
+    api
+      .get('/mentor/subscribers', { params: { limit: 8 } })
+      .then((res) => {
+        if (!cancelled) setSubscribers(res.students || []);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Failed to load subscribers');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSubscribers(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setSubscribers]);
 
   const chartData = useMemo(() => {
     if (!summary?.timeseries) return null;
@@ -136,8 +179,8 @@ export default function MentorDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+        {showSummarySkeleton ? (
+          Array.from({ length: 3 }).map((_, i) => <StatCardSkeleton key={i} />)
         ) : (
           <>
             <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
@@ -190,24 +233,28 @@ export default function MentorDashboard() {
                 </p>
               </CardContent>
             </Card>
-            
-            <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
-              <CardContent className="p-4 sm:p-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-50 dark:bg-cyan-900/20">
-                    <BarChart2 className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">Signals Posted Today</p>
-                </div>
-                <h3 className="text-[20px] sm:text-[24px] font-bold text-slate-900 dark:text-white mt-1">
-                  {signals.length || 0}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                  Total published by you today
-                </p>
-              </CardContent>
-            </Card>
           </>
+        )}
+
+        {showSignalsSkeleton ? (
+          <StatCardSkeleton />
+        ) : (
+          <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-50 dark:bg-cyan-900/20">
+                  <BarChart2 className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                </div>
+                <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">Signals Posted Today</p>
+              </div>
+              <h3 className="text-[20px] sm:text-[24px] font-bold text-slate-900 dark:text-white mt-1">
+                {signals.length || 0}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                Total published by you today
+              </p>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -217,7 +264,7 @@ export default function MentorDashboard() {
             <h2 className="text-[16px] font-bold text-slate-900 dark:text-white">Signal Publishing Frequency (Last 14 Days)</h2>
           </div>
           <CardContent className="p-5 flex-1 min-h-[300px]">
-            {isLoading ? (
+            {showSummarySkeleton ? (
               <Skeleton className="w-full h-full rounded-lg" />
             ) : chartData ? (
               <Line data={chartData} options={chartOptions} />
@@ -234,7 +281,7 @@ export default function MentorDashboard() {
             <h2 className="text-[16px] font-bold text-slate-900 dark:text-white">Latest Subscriptions</h2>
           </div>
           <CardContent className="p-5 flex-1">
-            {isLoading ? (
+            {showSubscribersSkeleton ? (
               <div className="space-y-4">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex flex-col gap-2">
@@ -269,7 +316,7 @@ export default function MentorDashboard() {
           <h2 className="text-[16px] font-bold text-slate-900 dark:text-white">Quick Review: Signals Today</h2>
         </div>
         <CardContent className="p-5">
-          {isLoading ? (
+          {showSignalsSkeleton ? (
             <div className="space-y-3">
               <Skeleton className="h-14 w-full rounded-xl" />
               <Skeleton className="h-14 w-full rounded-xl" />
@@ -310,7 +357,7 @@ export default function MentorDashboard() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Ranked by total signals posted</p>
         </div>
         <CardContent className="p-5">
-          {isLoading ? (
+          {showSummarySkeleton ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3">

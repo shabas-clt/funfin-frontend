@@ -3,42 +3,46 @@ import { AnimatePresence } from 'framer-motion';
 import ProtectedRoute from './ProtectedRoute';
 import AdminLayout from '../layouts/AdminLayout';
 import MentorLayout from '../layouts/MentorLayout';
-import Dashboard from '../pages/admin/dashboard/Dashboard';
-import CourseList from '../pages/admin/courses/CourseList';
-import CourseEditor from '../pages/admin/courses/CourseEditor';
-import StudentManagement from '../pages/admin/students/StudentManagement';
-import AdminManagement from '../pages/admin/admins/AdminManagement';
-import MentorManagement from '../pages/admin/mentors/MentorManagement';
-import FuncoinManagement from '../pages/admin/funcoin/FuncoinManagement';
-import PaymentsManagement from '../pages/admin/payments/PaymentsManagement';
-import ModerationQueue from '../pages/admin/moderation/ModerationQueue';
-import CouponManagement from '../pages/admin/coupons/CouponManagement';
-import CourseProgress from '../pages/admin/courses/CourseProgress';
-import Certificates from '../pages/admin/certificates/Certificates';
-import GamificationManagement from '../pages/admin/gamification/GamificationManagement';
-import NotificationBroadcast from '../pages/admin/notifications/NotificationBroadcast';
-import LiveChart from '../pages/admin/live-chart/LiveChart';
-import LiveEngineDashboard from '../pages/admin/live-engine/Dashboard';
-import TokenManagement from '../pages/admin/live-engine/TokenManagement';
-import MentorDashboard from '../pages/mentor/dashboard/MentorDashboard';
-import MentorSignals from '../pages/mentor/signals/MentorSignals';
 import SignIn from '../pages/auth/SignIn';
 import PageTransition from '../components/shared/PageTransition';
+import { lazyPage } from '../lib/lazyPage';
+
+// Pages load on demand, so the first download is only the shell and the
+// page being opened.
+const Dashboard = lazyPage(() => import('../pages/admin/dashboard/Dashboard'));
+const CourseList = lazyPage(() => import('../pages/admin/courses/CourseList'));
+const CourseEditor = lazyPage(() => import('../pages/admin/courses/CourseEditor'));
+const StudentManagement = lazyPage(() => import('../pages/admin/students/StudentManagement'));
+const AdminManagement = lazyPage(() => import('../pages/admin/admins/AdminManagement'));
+const MentorManagement = lazyPage(() => import('../pages/admin/mentors/MentorManagement'));
+const FuncoinManagement = lazyPage(() => import('../pages/admin/funcoin/FuncoinManagement'));
+const PaymentsManagement = lazyPage(() => import('../pages/admin/payments/PaymentsManagement'));
+const ModerationQueue = lazyPage(() => import('../pages/admin/moderation/ModerationQueue'));
+const CouponManagement = lazyPage(() => import('../pages/admin/coupons/CouponManagement'));
+const CourseProgress = lazyPage(() => import('../pages/admin/courses/CourseProgress'));
+const Certificates = lazyPage(() => import('../pages/admin/certificates/Certificates'));
+const GamificationManagement = lazyPage(() => import('../pages/admin/gamification/GamificationManagement'));
+const NotificationBroadcast = lazyPage(() => import('../pages/admin/notifications/NotificationBroadcast'));
+const LiveChart = lazyPage(() => import('../pages/admin/live-chart/LiveChart'));
+const LiveEngineDashboard = lazyPage(() => import('../pages/admin/live-engine/Dashboard'));
+const TokenManagement = lazyPage(() => import('../pages/admin/live-engine/TokenManagement'));
+const MentorDashboard = lazyPage(() => import('../pages/mentor/dashboard/MentorDashboard'));
+const MentorSignals = lazyPage(() => import('../pages/mentor/signals/MentorSignals'));
 
 // New admin panel features
-import MemesList from '../pages/admin/memes/MemesList';
-import PostingCategories from '../pages/admin/memes/PostingCategories';
-import ContentCategories from '../pages/admin/memes/ContentCategories';
-import ReferralConfig from '../pages/admin/referrals/ReferralConfig';
-import ReferralAnalytics from '../pages/admin/referrals/ReferralAnalytics';
-import ReferralRecords from '../pages/admin/referrals/ReferralRecords';
-import ReferralPayouts from '../pages/admin/referrals/ReferralPayouts';
-import LeaderboardsPreview from '../pages/admin/leaderboards/LeaderboardsPreview';
+const MemesList = lazyPage(() => import('../pages/admin/memes/MemesList'));
+const PostingCategories = lazyPage(() => import('../pages/admin/memes/PostingCategories'));
+const ContentCategories = lazyPage(() => import('../pages/admin/memes/ContentCategories'));
+const ReferralConfig = lazyPage(() => import('../pages/admin/referrals/ReferralConfig'));
+const ReferralAnalytics = lazyPage(() => import('../pages/admin/referrals/ReferralAnalytics'));
+const ReferralRecords = lazyPage(() => import('../pages/admin/referrals/ReferralRecords'));
+const ReferralPayouts = lazyPage(() => import('../pages/admin/referrals/ReferralPayouts'));
+const LeaderboardsPreview = lazyPage(() => import('../pages/admin/leaderboards/LeaderboardsPreview'));
 
 // Simulation Trading
-import StockCharts from '../pages/admin/simulation/StockCharts';
-import SimulationTrades from '../pages/admin/simulation/SimulationTrades';
-import SimulationStats from '../pages/admin/simulation/SimulationStats';
+const StockCharts = lazyPage(() => import('../pages/admin/simulation/StockCharts'));
+const SimulationTrades = lazyPage(() => import('../pages/admin/simulation/SimulationTrades'));
+const SimulationStats = lazyPage(() => import('../pages/admin/simulation/SimulationStats'));
 
 const AppRoutes = () => {
   const location = useLocation();

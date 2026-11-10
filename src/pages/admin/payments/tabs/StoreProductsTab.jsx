@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { Card, CardContent } from '@/components/ui/card';
 import { paymentsApi, errorText } from '@/api/paymentsApi';
 import { formatInr, formatNumber, formatUsd } from '@/lib/format';
+import { useCachedState } from '@/lib/pageCache';
 
 // Store products: the App Store and Google Play product behind every
 // paid item, and whether the apps offer it yet. A switch stays off until the
@@ -90,10 +91,15 @@ function Section({ title, type, hint, children }) {
 }
 
 export default function StoreProductsTab() {
-  const [data, setData] = useState(null);
+  // Cached so coming back to this tab shows the last list at once. The
+  // switches stay disabled until the refresh lands, so a background refresh
+  // can never undo a switch the admin just flipped.
+  const [data, setData] = useCachedState('payments-store:data', null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
-  const [showFree, setShowFree] = useState(false);
+  const [showFree, setShowFree] = useCachedState('payments-store:showFree', false);
+  const showSkeleton = loading && !data;
+  const isRefreshing = loading && !showSkeleton;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,7 +110,7 @@ export default function StoreProductsTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setData]);
 
   useEffect(() => {
     load();
@@ -125,7 +131,7 @@ export default function StoreProductsTab() {
     }
   };
 
-  if (loading || !data) {
+  if (showSkeleton || !data) {
     return (
       <div className="py-12 text-center text-slate-500 text-sm">
         <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
@@ -139,7 +145,7 @@ export default function StoreProductsTab() {
   const coursesLive = paidCourses.filter((c) => c.iosEnabled).length;
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
       <Card className="bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900">
         <CardContent className="p-4 text-sm text-slate-700 dark:text-slate-200 space-y-2">
           <div className="font-semibold text-slate-900 dark:text-white">Adding a product to the App Store</div>
@@ -197,7 +203,7 @@ export default function StoreProductsTab() {
                 <td key={flag} className={`${td} text-center`}>
                   <Toggle
                     on={data.proSignal[flag]}
-                    disabled={busy === `pro:${flag}`}
+                    disabled={loading || busy === `pro:${flag}`}
                     label={`Pro Signals ${flag === 'iosEnabled' ? 'iOS' : 'Android'}`}
                     onChange={(on) =>
                       flip(
@@ -255,7 +261,7 @@ export default function StoreProductsTab() {
                   <td key={flag} className={`${td} text-center`}>
                     <Toggle
                       on={!!p[flag]}
-                      disabled={busy === `pack:${p.id}:${flag}`}
+                      disabled={loading || busy === `pack:${p.id}:${flag}`}
                       label={`${p.name} ${flag === 'iosEnabled' ? 'iOS' : 'Android'}`}
                       onChange={(on) =>
                         flip(
@@ -324,7 +330,7 @@ export default function StoreProductsTab() {
                     ) : (
                       <Toggle
                         on={c[flag]}
-                        disabled={busy === `course:${c.id}:${flag}`}
+                        disabled={loading || busy === `course:${c.id}:${flag}`}
                         label={`${c.title} ${flag === 'iosEnabled' ? 'iOS' : 'Android'}`}
                         onChange={(on) =>
                           flip(

@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import { formatInr, formatUsd, formatNumber, formatShortDateTime } from '@/lib/format';
 import PaymentInstrument from '@/components/shared/PaymentInstrument';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 const PAGE_SIZE = 20;
 
@@ -41,21 +42,32 @@ function StatusBadge({ status }) {
 }
 
 export default function PurchasesTab() {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // List, page and filters are cached so reopening this tab shows the last
+  // page at once while it refreshes in the background.
+  const [rows, setRows] = useCachedState('funcoin-purchases:rows', []);
+  const [total, setTotal] = useCachedState('funcoin-purchases:total', 0);
+  const [skip, setSkip] = useCachedState('funcoin-purchases:skip', 0);
   const [loading, setLoading] = useState(true);
 
-  const [statusFilter, setStatusFilter] = useState('');
-  const [usernameInput, setUsernameInput] = useState('');
-  const [usernameFilter, setUsernameFilter] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [statusFilter, setStatusFilter] = useCachedState('funcoin-purchases:status', '');
+  const [usernameInput, setUsernameInput] = useCachedState('funcoin-purchases:usernameInput', '');
+  const [usernameFilter, setUsernameFilter] = useCachedState('funcoin-purchases:username', '');
+  const [fromDate, setFromDate] = useCachedState('funcoin-purchases:fromDate', '');
+  const [toDate, setToDate] = useCachedState('funcoin-purchases:toDate', '');
+  const [sortBy, setSortBy] = useCachedState('funcoin-purchases:sortBy', 'createdAt');
+  const [sortOrder, setSortOrder] = useCachedState('funcoin-purchases:sortOrder', 'desc');
+  const showSkeleton = loading && !hasCached('funcoin-purchases:rows');
+  const isRefreshing = loading && !showSkeleton;
+  // Stable functions; a slower response for an older page or filter is dropped.
+  const { begin, isLatest } = useLatestRequest();
+  // The filters the shown page belongs to, and the page restored on open.
+  const filterKey = [statusFilter, usernameFilter, fromDate, toDate, sortBy, sortOrder].join('|');
+  const pageFilterKey = useRef(filterKey);
+  const restoredSkip = useRef(skip);
 
   const load = useCallback(
     async (nextSkip = 0) => {
+      const id = begin();
       try {
         setLoading(true);
         const params = { skip: nextSkip, limit: PAGE_SIZE, sortBy, sortOrder };
@@ -64,21 +76,27 @@ export default function PurchasesTab() {
         if (fromDate) params.fromDate = fromDate;
         if (toDate) params.toDate = toDate;
         const res = await api.get('/funcoin/purchases', { params });
+        if (!isLatest(id)) return;
         setRows(res.purchases || []);
         setTotal(res.total || 0);
         setSkip(nextSkip);
       } catch (err) {
+        if (!isLatest(id)) return;
         toast.error(typeof err === 'string' ? err : 'Failed to load purchases');
       } finally {
-        setLoading(false);
+        if (isLatest(id)) setLoading(false);
       }
     },
-    [statusFilter, usernameFilter, fromDate, toDate, sortBy, sortOrder],
+    [statusFilter, usernameFilter, fromDate, toDate, sortBy, sortOrder, begin, isLatest, setRows, setTotal, setSkip],
   );
 
   useEffect(() => {
-    load(0);
-  }, [load]);
+    // On open, refresh the page the admin was on; after a filter or sort
+    // change, go back to the first page.
+    const keepPage = pageFilterKey.current === filterKey;
+    pageFilterKey.current = filterKey;
+    load(keepPage ? restoredSkip.current : 0);
+  }, [load, filterKey]);
 
   return (
     <div className="space-y-4">
@@ -151,8 +169,8 @@ export default function PurchasesTab() {
                   <th className="px-4 py-2.5 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {loading && (
+              <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
@@ -160,14 +178,14 @@ export default function PurchasesTab() {
                     </td>
                   </tr>
                 )}
-                {!loading && rows.length === 0 && (
+                {!showSkeleton && rows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
                       No purchases match those filters.
                     </td>
                   </tr>
                 )}
-                {!loading &&
+                {!showSkeleton &&
                   rows.map((row) => {
                     const instrument = toInstrument(row);
                     return (

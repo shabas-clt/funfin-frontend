@@ -8,6 +8,8 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { formatShortDate, parseServerDate } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 const FILTER_OPTIONS = ['All', 'user', 'mentor'];
 const PAGE_SIZE = 12;
@@ -68,18 +70,28 @@ const primaryRole = (roles) => {
 };
 
 export default function StudentManagement() {
-  const [students, setStudents] = useState([]);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [students, setStudents] = useCachedState('students:rows', []);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useCachedState('students:search', '');
+  const debouncedSearch = useDebouncedValue(searchQuery);
+  const [filterRole, setFilterRole] = useCachedState('students:role', '');
+  const [sortBy, setSortBy] = useCachedState('students:sort', 'newest');
+  const [skip, setSkip] = useCachedState('students:skip', 0);
+  const [total, setTotal] = useCachedState('students:total', 0);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [view, setView] = useState('active'); // 'active' | 'archived'
+  const [view, setView] = useCachedState('students:view', 'active'); // 'active' | 'archived'
   const isArchived = view === 'archived';
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached('students:rows');
+  const isRefreshing = isLoading && !showSkeleton;
+  const request = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const fetchStudents = async (nextSkip = skip) => {
+    const id = request.begin();
     try {
       setIsLoading(true);
       const sortMap = {
@@ -91,32 +103,36 @@ export default function StudentManagement() {
       const sortCfg = sortMap[sortBy] || sortMap.newest;
       const endpoint = isArchived ? '/students/archived' : '/students';
       const params = isArchived
-        ? { skip: nextSkip, limit: PAGE_SIZE, q: searchQuery || undefined }
+        ? { skip: nextSkip, limit: PAGE_SIZE, q: debouncedSearch || undefined }
         : {
             skip: nextSkip,
             limit: PAGE_SIZE,
-            q: searchQuery || undefined,
+            q: debouncedSearch || undefined,
             role: filterRole || undefined,
             sortBy: sortCfg.sortBy,
             sortOrder: sortCfg.sortOrder,
           };
       const res = await api.get(endpoint, { params });
+      if (!request.isLatest(id)) return;
       setStudents(res.students || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!request.isLatest(id)) return;
       setStudents([]);
       setTotal(0);
       toast.error('Failed to load students');
     } finally {
-      setIsLoading(false);
+      if (request.isLatest(id)) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStudents(0);
+    // On open, refresh the page the admin was on; after a filter or search
+    // change, go back to the first page.
+    fetchStudents(restorePage(skip, [debouncedSearch, filterRole, sortBy, view]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, filterRole, sortBy, view]);
+  }, [debouncedSearch, filterRole, sortBy, view]);
 
   const handleRecover = async (id) => {
     const result = await Swal.fire({
@@ -218,8 +234,8 @@ export default function StudentManagement() {
             </div>
           </div>
 
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -290,8 +306,8 @@ export default function StudentManagement() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={6} cols={6} />
                 ) : students.length === 0 ? (
                   <tr>
@@ -354,7 +370,7 @@ export default function StudentManagement() {
             </table>
           </div>
 
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -362,7 +378,7 @@ export default function StudentManagement() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => fetchStudents(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -371,7 +387,7 @@ export default function StudentManagement() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => fetchStudents(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

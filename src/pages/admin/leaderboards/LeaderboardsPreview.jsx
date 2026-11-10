@@ -5,26 +5,64 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { clientApi } from '@/api/axios';
 import { useAuth } from '../../../context/AuthContext';
 import LeaderboardTable from '../../../components/admin/leaderboards/LeaderboardTable';
+import { useCachedState } from '@/lib/pageCache';
+
+function BoardSkeleton() {
+  return (
+    <div className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 dark:border-neutral-800">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-32 mt-2" />
+      </div>
+      <div className="p-6 space-y-3">
+        {Array.from({ length: 5 }).map((_, j) => (
+          <div key={j} className="flex items-center gap-4">
+            <Skeleton className="w-8 h-8 rounded-full" />
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="w-24 h-6" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function LeaderboardsPreview() {
   const { isAuthenticated } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [coinsLeaderboard, setCoinsLeaderboard] = useState(null);
-  const [winRateLeaderboard, setWinRateLeaderboard] = useState(null);
+  // Cached so coming back to this page shows the last boards at once while
+  // they refresh. Each board loads on its own and shows as soon as it lands.
+  const [loadingCoins, setLoadingCoins] = useState(true);
+  const [loadingSimulation, setLoadingSimulation] = useState(true);
+  const [coinsLeaderboard, setCoinsLeaderboard] = useCachedState('leaderboards-preview:coins', null);
+  const [winRateLeaderboard, setWinRateLeaderboard] = useCachedState('leaderboards-preview:simulation', null);
+  const loading = loadingCoins || loadingSimulation;
+  const showCoinsSkeleton = loadingCoins && !coinsLeaderboard;
+  const showSimulationSkeleton = loadingSimulation && !winRateLeaderboard;
 
-  const loadLeaderboards = async (isRefresh = false) => {
-    if (!isAuthenticated) return;
-    if (!isRefresh) setLoading(true);
-
+  // Note: These endpoints are on the client API but now accept both user and admin tokens
+  const loadCoins = async (isRefresh) => {
+    if (!isRefresh) setLoadingCoins(true);
     try {
-      // Note: These endpoints are on the client API but now accept both user and admin tokens
-      const [coinsData, simulationData] = await Promise.all([
-        clientApi.get('/leaderboard/all-time/coins', { params: { limit: 20 } }),
-        clientApi.get('/simulation/leaderboard/global', { params: { limit: 20, week: 'current' } })
-      ]);
-      
+      const coinsData = await clientApi.get('/leaderboard/all-time/coins', { params: { limit: 20 } });
       setCoinsLeaderboard({ ...coinsData, type: 'coins' });
-      
+    } catch (error) {
+      const message = typeof error === 'string' ? error : 'Failed to load coins leaderboard';
+      toast.error(message);
+      console.error('Coins leaderboard fetch error:', error);
+    } finally {
+      setLoadingCoins(false);
+    }
+  };
+
+  const loadSimulation = async (isRefresh) => {
+    if (!isRefresh) setLoadingSimulation(true);
+    try {
+      const simulationData = await clientApi.get('/simulation/leaderboard/global', { params: { limit: 20, week: 'current' } });
+
       // Transform simulation leaderboard to match expected format
       const transformedSimulation = {
         type: 'simulation',
@@ -44,12 +82,18 @@ export default function LeaderboardsPreview() {
       
       setWinRateLeaderboard(transformedSimulation);
     } catch (error) {
-      const message = typeof error === 'string' ? error : 'Failed to load leaderboards';
+      const message = typeof error === 'string' ? error : 'Failed to load simulation leaderboard';
       toast.error(message);
-      console.error('Leaderboards fetch error:', error);
+      console.error('Simulation leaderboard fetch error:', error);
     } finally {
-      setLoading(false);
+      setLoadingSimulation(false);
     }
+  };
+
+  const loadLeaderboards = (isRefresh = false) => {
+    if (!isAuthenticated) return;
+    loadCoins(isRefresh);
+    loadSimulation(isRefresh);
   };
 
   useEffect(() => {
@@ -77,42 +121,28 @@ export default function LeaderboardsPreview() {
         </button>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[1, 2].map((i) => (
-            <div key={i} className="bg-white dark:bg-neutral-950 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 dark:border-neutral-800">
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-4 w-32 mt-2" />
-              </div>
-              <div className="p-6 space-y-3">
-                {Array.from({ length: 5 }).map((_, j) => (
-                  <div key={j} className="flex items-center gap-4">
-                    <Skeleton className="w-8 h-8 rounded-full" />
-                    <Skeleton className="w-10 h-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-20" />
-                    </div>
-                    <Skeleton className="w-24 h-6" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <LeaderboardTable 
-            leaderboard={coinsLeaderboard} 
-            title="All-Time Coins Earned" 
-          />
-          <LeaderboardTable 
-            leaderboard={winRateLeaderboard} 
-            title="Simulation Trading Leaderboard (Current Week)" 
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {showCoinsSkeleton ? (
+          <BoardSkeleton />
+        ) : (
+          <div className={`transition-opacity ${loadingCoins ? 'opacity-60' : ''}`}>
+            <LeaderboardTable 
+              leaderboard={coinsLeaderboard} 
+              title="All-Time Coins Earned" 
+            />
+          </div>
+        )}
+        {showSimulationSkeleton ? (
+          <BoardSkeleton />
+        ) : (
+          <div className={`transition-opacity ${loadingSimulation ? 'opacity-60' : ''}`}>
+            <LeaderboardTable 
+              leaderboard={winRateLeaderboard} 
+              title="Simulation Trading Leaderboard (Current Week)" 
+            />
+          </div>
+        )}
+      </div>
 
       <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
         <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 mb-2">Calculation Methods</h3>

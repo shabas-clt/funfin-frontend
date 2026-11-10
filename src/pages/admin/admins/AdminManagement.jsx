@@ -16,6 +16,8 @@ import { adminCreateSchema, adminUpdateSchema } from '@/lib/validation/schemas';
 import { applyServerErrors } from '@/lib/validation/serverErrors';
 import { formatShortDate } from '@/lib/format';
 import FieldError from '@/components/shared/FieldError';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 const ROLE_FILTER_OPTIONS = ['All', 'admin', 'superadmin'];
 
@@ -47,14 +49,23 @@ export default function AdminManagement() {
   const { admin: currentAdmin } = useAuth();
   const isSuperAdmin = String(currentAdmin?.role || '').toLowerCase() === 'superadmin';
 
-  const [admins, setAdmins] = useState([]);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [admins, setAdmins] = useCachedState('admins:rows', []);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useCachedState('admins:search', '');
+  const debouncedSearch = useDebouncedValue(searchQuery);
+  const [filterRole, setFilterRole] = useCachedState('admins:role', '');
+  const [sortBy, setSortBy] = useCachedState('admins:sortBy', 'createdAt');
+  const [sortOrder, setSortOrder] = useCachedState('admins:sortOrder', 'desc');
+  const [skip, setSkip] = useCachedState('admins:skip', 0);
+  const [total, setTotal] = useCachedState('admins:total', 0);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached('admins:rows');
+  const isRefreshing = isLoading && !showSkeleton;
+  const request = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -75,6 +86,7 @@ export default function AdminManagement() {
   });
 
   const fetchAdmins = async (nextSkip = skip) => {
+    const id = request.begin();
     try {
       setIsLoading(true);
       const params = {
@@ -82,28 +94,33 @@ export default function AdminManagement() {
         // Mentors have their own page. Excluding them on the server keeps
         // each page full and the total correct.
         excludeRole: filterRole ? undefined : 'mentor',
-        q: searchQuery || undefined,
+        q: debouncedSearch || undefined,
         sortBy,
         sortOrder,
         skip: nextSkip,
         limit: PAGE_SIZE,
       };
       const res = await api.get('/admins', { params });
+      if (!request.isLatest(id)) return;
       setAdmins(res.admins || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!request.isLatest(id)) return;
       setAdmins([]);
       setTotal(0);
       toast.error('Failed to load admins');
     } finally {
-      setIsLoading(false);
+      if (request.isLatest(id)) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdmins(0);
-  }, [filterRole, sortBy, sortOrder, searchQuery]);
+    // On open, refresh the page the admin was on; after a filter or search
+    // change, go back to the first page.
+    fetchAdmins(restorePage(skip, [filterRole, sortBy, sortOrder, debouncedSearch]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterRole, sortBy, sortOrder, debouncedSearch]);
 
   const onSearchSubmit = (e) => {
     e.preventDefault();
@@ -301,8 +318,8 @@ export default function AdminManagement() {
           </div>
 
           {/* Phone (<md): card stack */}
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -356,8 +373,8 @@ export default function AdminManagement() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={5} cols={6} />
                 ) : admins.length === 0 ? (
                   <tr>
@@ -416,7 +433,7 @@ export default function AdminManagement() {
               </tbody>
             </table>
           </div>
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -424,7 +441,7 @@ export default function AdminManagement() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => fetchAdmins(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -433,7 +450,7 @@ export default function AdminManagement() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => fetchAdmins(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

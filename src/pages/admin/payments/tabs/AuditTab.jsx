@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { Card, CardContent } from '@/components/ui/card';
 import { paymentsApi, errorText } from '@/api/paymentsApi';
 import { formatNumber, formatShortDateTime } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
 import { Pager } from '@/components/admin/payments/PurchaseTable';
 import { KIND_LABELS } from '@/components/admin/payments/badges';
 
@@ -45,27 +46,41 @@ function detailText(entry) {
 }
 
 export default function AuditTab({ onOpenUser }) {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // Cached so coming back to this tab shows the last page at once and
+  // refreshes it in the background.
+  const [rows, setRows] = useCachedState('payments-audit:rows', []);
+  const [total, setTotal] = useCachedState('payments-audit:total', 0);
+  const [skip, setSkip] = useCachedState('payments-audit:skip', 0);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = loading && !hasCached('payments-audit:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const { begin: beginRequest, isLatest } = useLatestRequest();
+  const restorePage = usePageRestore();
 
-  const load = useCallback(async (nextSkip = 0) => {
-    setLoading(true);
-    try {
-      const res = await paymentsApi.audit({ skip: nextSkip, limit: PAGE_SIZE });
-      setRows(res.entries || []);
-      setTotal(res.total || 0);
-      setSkip(nextSkip);
-    } catch (err) {
-      toast.error(errorText(err, 'Failed to load audit log'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (nextSkip = 0) => {
+      const id = beginRequest();
+      setLoading(true);
+      try {
+        const res = await paymentsApi.audit({ skip: nextSkip, limit: PAGE_SIZE });
+        if (!isLatest(id)) return;
+        setRows(res.entries || []);
+        setTotal(res.total || 0);
+        setSkip(nextSkip);
+      } catch (err) {
+        if (!isLatest(id)) return;
+        toast.error(errorText(err, 'Failed to load audit log'));
+      } finally {
+        if (isLatest(id)) setLoading(false);
+      }
+    },
+    [beginRequest, isLatest, setRows, setTotal, setSkip],
+  );
 
   useEffect(() => {
-    load(0);
+    // On open, refresh the page the admin was on.
+    load(restorePage(skip, [load]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   return (
@@ -82,8 +97,8 @@ export default function AuditTab({ onOpenUser }) {
                 <th className="px-4 py-2.5 font-medium">Reason</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-              {loading && (
+            <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+              {showSkeleton && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
@@ -91,14 +106,14 @@ export default function AuditTab({ onOpenUser }) {
                   </td>
                 </tr>
               )}
-              {!loading && rows.length === 0 && (
+              {!showSkeleton && rows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     No admin actions yet.
                   </td>
                 </tr>
               )}
-              {!loading &&
+              {!showSkeleton &&
                 rows.map((e) => (
                   <tr key={e.id} className="align-top">
                     <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">{formatShortDateTime(e.createdAt)}</td>

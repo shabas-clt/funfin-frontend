@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
+import { useCachedState } from '@/lib/pageCache';
 import { useAuth } from '../../../context/AuthContext';
 import StatsCards from '../../../components/admin/referrals/StatsCards';
 import StatusPieChart from '../../../components/admin/referrals/StatusPieChart';
@@ -11,7 +12,11 @@ import StatusPieChart from '../../../components/admin/referrals/StatusPieChart';
 export default function ReferralAnalytics() {
   const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [analytics, setAnalytics] = useState(null);
+  // Cached so coming back to this page shows the last numbers at once while
+  // they refresh.
+  const [analytics, setAnalytics] = useCachedState('referral-analytics:data', null);
+  const showSkeleton = loading && !analytics;
+  const isRefreshing = loading && !showSkeleton;
 
   const loadAnalytics = async (isRefresh = false) => {
     if (!isAuthenticated) return;
@@ -54,7 +59,7 @@ export default function ReferralAnalytics() {
         </button>
       </div>
 
-      {loading ? (
+      {showSkeleton ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -75,7 +80,7 @@ export default function ReferralAnalytics() {
           </div>
         </div>
       ) : analytics ? (
-        <div className="space-y-6">
+        <div className={`space-y-6 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
           <StatsCards analytics={analytics} />
           <StatusPieChart analytics={analytics} />
         </div>

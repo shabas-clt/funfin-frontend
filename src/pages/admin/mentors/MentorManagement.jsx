@@ -15,6 +15,8 @@ import { mentorCreateSchema, mentorUpdateSchema } from '@/lib/validation/schemas
 import { applyServerErrors } from '@/lib/validation/serverErrors';
 import { formatShortDate } from '@/lib/format';
 import FieldError from '@/components/shared/FieldError';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 const STATUS_FILTER_OPTIONS = ['All', 'Active', 'Inactive'];
 
@@ -23,12 +25,21 @@ const EDIT_DEFAULTS = { fullName: '', email: '', password: '', isActive: true };
 const PAGE_SIZE = 12;
 
 export default function MentorManagement() {
-  const [mentors, setMentors] = useState([]);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [mentors, setMentors] = useCachedState('mentors:rows', []);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useCachedState('mentors:search', '');
+  const debouncedSearch = useDebouncedValue(searchQuery);
+  const [filterStatus, setFilterStatus] = useCachedState('mentors:status', '');
+  const [skip, setSkip] = useCachedState('mentors:skip', 0);
+  const [total, setTotal] = useCachedState('mentors:total', 0);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached('mentors:rows');
+  const isRefreshing = isLoading && !showSkeleton;
+  const request = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -47,32 +58,38 @@ export default function MentorManagement() {
   });
 
   const fetchMentors = async (nextSkip = skip) => {
+    const id = request.begin();
     try {
       setIsLoading(true);
       const res = await api.get('/admins', {
         params: {
           role: 'mentor',
           isActive: filterStatus === 'All' || !filterStatus ? undefined : filterStatus === 'Active',
-          q: searchQuery || undefined,
+          q: debouncedSearch || undefined,
           skip: nextSkip,
           limit: PAGE_SIZE,
         },
       });
+      if (!request.isLatest(id)) return;
       setMentors(res.admins || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!request.isLatest(id)) return;
       setMentors([]);
       setTotal(0);
       toast.error('Failed to load mentors');
     } finally {
-      setIsLoading(false);
+      if (request.isLatest(id)) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMentors(0);
-  }, [searchQuery, filterStatus]);
+    // On open, refresh the page the admin was on; after a filter or search
+    // change, go back to the first page.
+    fetchMentors(restorePage(skip, [debouncedSearch, filterStatus]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filterStatus]);
 
   const openAddModal = () => {
     addForm.reset(ADD_DEFAULTS);
@@ -203,8 +220,8 @@ export default function MentorManagement() {
           </div>
 
           {/* Phone (<md): card stack */}
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-20 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -254,8 +271,8 @@ export default function MentorManagement() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={5} cols={5} />
                 ) : mentors.length === 0 ? (
                   <tr>
@@ -306,7 +323,7 @@ export default function MentorManagement() {
               </tbody>
             </table>
           </div>
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -314,7 +331,7 @@ export default function MentorManagement() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => fetchMentors(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -323,7 +340,7 @@ export default function MentorManagement() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => fetchMentors(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

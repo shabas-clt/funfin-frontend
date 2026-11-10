@@ -5,25 +5,33 @@ import { Card, CardContent } from '@/components/ui/card';
 import { paymentsApi, errorText } from '@/api/paymentsApi';
 import PurchaseTable, { Pager } from '@/components/admin/payments/PurchaseTable';
 import { CHANNEL_LABELS, KIND_LABELS, inputClass, selectClass } from '@/components/admin/payments/badges';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
 
 const PAGE_SIZE = 20;
 
 export default function PurchasesTab({ onOpenUser }) {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // List, filters and page are cached, so coming back to this tab shows the
+  // last list at once and refreshes it in the background.
+  const [rows, setRows] = useCachedState('payments-purchases:rows', []);
+  const [total, setTotal] = useCachedState('payments-purchases:total', 0);
+  const [skip, setSkip] = useCachedState('payments-purchases:skip', 0);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = loading && !hasCached('payments-purchases:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const { begin: beginRequest, isLatest } = useLatestRequest();
+  const restorePage = usePageRestore();
 
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [kind, setKind] = useState('');
-  const [channel, setChannel] = useState('');
-  const [status, setStatus] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [searchInput, setSearchInput] = useCachedState('payments-purchases:searchInput', '');
+  const [search, setSearch] = useCachedState('payments-purchases:search', '');
+  const [kind, setKind] = useCachedState('payments-purchases:kind', '');
+  const [channel, setChannel] = useCachedState('payments-purchases:channel', '');
+  const [status, setStatus] = useCachedState('payments-purchases:status', '');
+  const [fromDate, setFromDate] = useCachedState('payments-purchases:fromDate', '');
+  const [toDate, setToDate] = useCachedState('payments-purchases:toDate', '');
 
   const load = useCallback(
     async (nextSkip = 0) => {
+      const id = beginRequest();
       setLoading(true);
       try {
         const params = { skip: nextSkip, limit: PAGE_SIZE };
@@ -34,20 +42,25 @@ export default function PurchasesTab({ onOpenUser }) {
         if (fromDate) params.fromDate = fromDate;
         if (toDate) params.toDate = toDate;
         const res = await paymentsApi.purchases(params);
+        if (!isLatest(id)) return;
         setRows(res.purchases || []);
         setTotal(res.total || 0);
         setSkip(nextSkip);
       } catch (err) {
+        if (!isLatest(id)) return;
         toast.error(errorText(err, 'Failed to load purchases'));
       } finally {
-        setLoading(false);
+        if (isLatest(id)) setLoading(false);
       }
     },
-    [search, kind, channel, status, fromDate, toDate],
+    [search, kind, channel, status, fromDate, toDate, beginRequest, isLatest, setRows, setTotal, setSkip],
   );
 
   useEffect(() => {
-    load(0);
+    // On open, refresh the page the admin was on; after a filter or search
+    // change, go back to the first page.
+    load(restorePage(skip, [load]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   return (
@@ -108,12 +121,14 @@ export default function PurchasesTab({ onOpenUser }) {
           />
         </div>
 
-        <PurchaseTable
-          rows={rows}
-          loading={loading}
-          onReload={() => load(skip)}
-          onOpenUser={onOpenUser}
-        />
+        <div className={`transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+          <PurchaseTable
+            rows={rows}
+            loading={showSkeleton}
+            onReload={() => load(skip)}
+            onOpenUser={onOpenUser}
+          />
+        </div>
         <Pager skip={skip} total={total} pageSize={PAGE_SIZE} loading={loading} onPage={load} />
       </CardContent>
     </Card>
