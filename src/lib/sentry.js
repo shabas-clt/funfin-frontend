@@ -88,9 +88,9 @@ export function reportApiError(error) {
   const detail = error?.response?.data?.detail;
   const uploadMb = files ? +files.reduce((sum, f) => sum + f.sizeMb, 0).toFixed(1) : undefined;
   // The browser hides the status of a response that lacks CORS headers, so
-  // when nginx rejects a big upload (413) the panel only sees a network
-  // error. Flag that case so the issue points at the size limit.
-  const hint = !status && uploadMb >= 50 ? 'likely-upload-size-limit' : undefined;
+  // when nginx rejects or cuts off a big upload (413, timeout) the panel only
+  // sees a network error. Flag that case so the issue points at the server.
+  const hint = !status && uploadMb >= 50 ? 'large-upload-failed-at-server' : undefined;
 
   Sentry.withScope((scope) => {
     scope.setLevel(!status || status >= 500 || status === 413 ? 'error' : 'warning');
@@ -110,7 +110,9 @@ export function reportApiError(error) {
       uploadFiles: files,
     });
     scope.setFingerprint(['api', method, path, status ? String(status) : 'none']);
-    const suffix = hint ? ` (${uploadMb} MB upload, likely over the server size limit)` : '';
+    const suffix = hint
+      ? ` (${uploadMb} MB upload; check the nginx error log for a 413 or timeout)`
+      : '';
     Sentry.captureMessage(`${label} ${method} ${path}${suffix}`);
   });
 }
