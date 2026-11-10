@@ -79,6 +79,9 @@ export default function AdminManagement() {
       setIsLoading(true);
       const params = {
         role: filterRole || undefined,
+        // Mentors have their own page. Excluding them on the server keeps
+        // each page full and the total correct.
+        excludeRole: filterRole ? undefined : 'mentor',
         q: searchQuery || undefined,
         sortBy,
         sortOrder,
@@ -86,8 +89,7 @@ export default function AdminManagement() {
         limit: PAGE_SIZE,
       };
       const res = await api.get('/admins', { params });
-      const rows = (res.admins || []).filter((row) => row.role !== 'mentor');
-      setAdmins(rows);
+      setAdmins(res.admins || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
