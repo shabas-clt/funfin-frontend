@@ -117,7 +117,7 @@ export default function CertificateSignaturesModal({ isOpen, onClose }) {
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Course mentor</h3>
           <Field label="Name" value={values.instructorName} placeholder={effective.instructorName} onChange={set('instructorName')} disabled={busy} />
-          <Field label="Title" value={values.instructorTitle} placeholder={effective.instructorTitle} onChange={set('instructorTitle')} disabled={busy} hint="Printed as “Title, FunFin Academy”." />
+          <Field label="Title" value={values.instructorTitle} placeholder={effective.instructorTitle} onChange={set('instructorTitle')} disabled={busy} hint="Printed as “Title, FunFin”." />
         </div>
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Director</h3>
