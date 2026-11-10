@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, Users, Trophy, TrendingUp, BookOpen } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import { formatNumber, formatShortDateTime } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 const PAGE_SIZE = 25;
 
@@ -44,12 +45,21 @@ export default function CourseProgress() {
   const { id } = useParams();
   const location = useLocation();
   const basePath = location.pathname.startsWith('/mentor') ? '/mentor' : '/admin';
-  const [course, setCourse] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // Cached per course so reopening this page shows the last numbers and
+  // learner page at once while they refresh in the background.
+  const [course, setCourse] = useCachedState(`course-progress:${id}:course`, null);
+  const [summary, setSummary] = useCachedState(`course-progress:${id}:summary`, null);
+  const [users, setUsers] = useCachedState(`course-progress:${id}:users`, []);
+  const [total, setTotal] = useCachedState(`course-progress:${id}:total`, 0);
+  const [skip, setSkip] = useCachedState(`course-progress:${id}:skip`, 0);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = loading && !hasCached(`course-progress:${id}:users`);
+  const isRefreshing = loading && !showSkeleton;
+  // Stable functions; a slower response for an older learner page is dropped.
+  const { begin, isLatest } = useLatestRequest();
+  // The course the shown page belongs to, and the page restored on open.
+  const pageCourseId = useRef(id);
+  const restoredSkip = useRef(skip);
 
   const loadCourse = useCallback(async () => {
     try {
@@ -58,7 +68,7 @@ export default function CourseProgress() {
     } catch {
       toast.error('Failed to load course');
     }
-  }, [id]);
+  }, [id, setCourse]);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -67,32 +77,39 @@ export default function CourseProgress() {
     } catch (err) {
       if (err?.status !== 404) toast.error('Failed to load progress summary');
     }
-  }, [id]);
+  }, [id, setSummary]);
 
   const loadUsers = useCallback(
     async (nextSkip = 0) => {
+      const reqId = begin();
       try {
         setLoading(true);
         const res = await api.get(`/courses/${id}/progress-users`, {
           params: { skip: nextSkip, limit: PAGE_SIZE },
         });
+        if (!isLatest(reqId)) return;
         setUsers(res.users || []);
         setTotal(res.total || 0);
         setSkip(nextSkip);
       } catch {
+        if (!isLatest(reqId)) return;
         toast.error('Failed to load learners');
       } finally {
-        setLoading(false);
+        if (isLatest(reqId)) setLoading(false);
       }
     },
-    [id],
+    [id, begin, isLatest, setUsers, setTotal, setSkip],
   );
 
   useEffect(() => {
     loadCourse();
     loadSummary();
-    loadUsers(0);
-  }, [loadCourse, loadSummary, loadUsers]);
+    // On open, refresh the learner page the admin was on; another course
+    // starts on the first page.
+    const keepPage = pageCourseId.current === id;
+    pageCourseId.current = id;
+    loadUsers(keepPage ? restoredSkip.current : 0);
+  }, [loadCourse, loadSummary, loadUsers, id]);
 
   return (
     <div className="space-y-5">
@@ -163,22 +180,22 @@ export default function CourseProgress() {
                   <th className="px-4 py-2.5 font-medium">Last activity</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {loading && (
+              <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
                     </td>
                   </tr>
                 )}
-                {!loading && users.length === 0 && (
+                {!showSkeleton && users.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-slate-500 text-sm">
                       No one has made progress yet.
                     </td>
                   </tr>
                 )}
-                {!loading &&
+                {!showSkeleton &&
                   users.map((row) => (
                     <tr key={row.userId} className="hover:bg-slate-50 dark:hover:bg-neutral-900/60">
                       <td className="px-4 py-2.5">

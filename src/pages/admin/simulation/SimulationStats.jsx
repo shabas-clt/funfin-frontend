@@ -1,33 +1,57 @@
 import { useEffect, useState } from 'react';
 import { RefreshCw, TrendingUp, TrendingDown, Users, DollarSign, Activity, Trophy } from 'lucide-react';
 import { simulationApi } from '../../../api/simulationApi';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 const SimulationStats = () => {
-  const [stats, setStats] = useState(null);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Cached so coming back to this page shows the last numbers at once while
+  // they refresh. Stats and leaderboard load on their own, so each shows as
+  // soon as its own request returns.
+  const [stats, setStats] = useCachedState('simulation-stats:stats', null);
+  const [leaderboard, setLeaderboard] = useCachedState('simulation-stats:leaderboard', []);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [error, setError] = useState('');
+  const [leaderboardError, setLeaderboardError] = useState('');
+  const loading = loadingStats || loadingLeaderboard;
+  const showLeaderboardSkeleton = loadingLeaderboard && !hasCached('simulation-stats:leaderboard');
+  const isRefreshingLeaderboard = loadingLeaderboard && !showLeaderboardSkeleton;
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadStats = async () => {
+    setLoadingStats(true);
     setError('');
     try {
-      const [statsData, leaderboardData] = await Promise.all([
-        simulationApi.getStats(),
-        simulationApi.getLeaderboard({ limit: 10 }),
-      ]);
-      setStats(statsData);
-      setLeaderboard(leaderboardData.leaderboard || []);
+      setStats(await simulationApi.getStats());
     } catch (err) {
-      console.error('Error loading data:', err);
+      console.error('Error loading stats:', err);
       setError(typeof err === 'string' ? err : 'Failed to load statistics');
     } finally {
-      setLoading(false);
+      setLoadingStats(false);
     }
+  };
+
+  const loadLeaderboard = async () => {
+    setLoadingLeaderboard(true);
+    setLeaderboardError('');
+    try {
+      const leaderboardData = await simulationApi.getLeaderboard({ limit: 10 });
+      setLeaderboard(leaderboardData.leaderboard || []);
+    } catch (err) {
+      console.error('Error loading leaderboard:', err);
+      setLeaderboardError(typeof err === 'string' ? err : 'Failed to load leaderboard');
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
+  const loadData = () => {
+    loadStats();
+    loadLeaderboard();
   };
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formatNumber = (value) => {
@@ -80,11 +104,16 @@ const SimulationStats = () => {
             {error}
           </div>
         )}
+        {leaderboardError && leaderboardError !== error && (
+          <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            {leaderboardError}
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
       {stats && (
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={`mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 transition-opacity ${loadingStats ? 'opacity-60' : ''}`}>
           <StatCard
             title="Active Trades"
             value={formatNumber(stats.totalActiveTrades)}
@@ -160,8 +189,8 @@ const SimulationStats = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
-              {loading ? (
+            <tbody className={`divide-y divide-slate-200 dark:divide-neutral-800 transition-opacity ${isRefreshingLeaderboard ? 'opacity-60' : ''}`}>
+              {showLeaderboardSkeleton ? (
                 <tr>
                   <td colSpan="6" className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                     Loading leaderboard...

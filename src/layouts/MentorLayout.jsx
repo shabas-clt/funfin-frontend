@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState , Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/shared/Sidebar';
 import Header from '../components/shared/Header';
+import PageFallback from '../components/shared/PageFallback';
 
 const MentorLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -14,7 +15,9 @@ const MentorLayout = () => {
         <Header setIsSidebarOpen={setIsSidebarOpen} />
 
         <main className="flex-1 overflow-y-auto w-full p-4 md:p-6">
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

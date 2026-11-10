@@ -8,6 +8,7 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 import { referralApi } from '@/api/referralApi';
 import { useAuth } from '../../../context/AuthContext';
 import { formatUsd, formatShortDateTime } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
 import RiskBadge from '../../../components/admin/referrals/RiskBadge';
 import PayoutDetailModal from '../../../components/admin/referrals/PayoutDetailModal';
 
@@ -39,15 +40,24 @@ function StatusBadge({ status }) {
 
 export default function ReferralPayouts() {
   const { isAuthenticated } = useAuth();
-  const [payouts, setPayouts] = useState([]);
+  // List, tab and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background.
+  const [payouts, setPayouts] = useCachedState('referral-payouts:rows', []);
   const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState('pending_review');
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [status, setStatus] = useCachedState('referral-payouts:status', 'pending_review');
+  const [skip, setSkip] = useCachedState('referral-payouts:skip', 0);
+  const [total, setTotal] = useCachedState('referral-payouts:total', 0);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached('referral-payouts:rows');
+  const isRefreshing = isLoading && !showSkeleton;
+  const { begin: beginRequest, isLatest: isLatestRequest } = useLatestRequest();
+  const restorePage = usePageRestore();
   const [selectedId, setSelectedId] = useState(null);
 
   const fetchPayouts = useCallback(async (nextSkip = 0, nextStatus = status) => {
     if (!isAuthenticated) return;
+    const id = beginRequest();
     setIsLoading(true);
     try {
       const res = await referralApi.getPayouts({
@@ -55,20 +65,24 @@ export default function ReferralPayouts() {
         limit: PAGE_SIZE,
         status: nextStatus || undefined,
       });
+      if (!isLatestRequest(id)) return;
       setPayouts(res.payouts || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch (error) {
+      if (!isLatestRequest(id)) return;
       setPayouts([]);
       setTotal(0);
       toast.error(typeof error === 'string' ? error : 'Failed to load payouts');
     } finally {
-      setIsLoading(false);
+      if (isLatestRequest(id)) setIsLoading(false);
     }
-  }, [isAuthenticated, status]);
+  }, [isAuthenticated, status, beginRequest, isLatestRequest, setPayouts, setTotal, setSkip]);
 
   useEffect(() => {
-    fetchPayouts(0, status);
+    // On open, refresh the page the admin was on; after a tab change, go
+    // back to the first page.
+    fetchPayouts(restorePage(skip, [status]), status);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, status]);
 
@@ -110,14 +124,14 @@ export default function ReferralPayouts() {
                 </button>
               );
             })}
-            {!isLoading && (
+            {!showSkeleton && (
               <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{total} total</span>
             )}
           </div>
 
           {/* Mobile cards */}
-          <div className="md:hidden px-3 py-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 py-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="h-28 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
               ))
@@ -164,8 +178,8 @@ export default function ReferralPayouts() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={8} cols={7} />
                 ) : payouts.length === 0 ? (
                   <tr>
@@ -216,7 +230,7 @@ export default function ReferralPayouts() {
           </div>
 
           {/* Pagination */}
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -224,7 +238,7 @@ export default function ReferralPayouts() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => fetchPayouts(Math.max(0, skip - PAGE_SIZE), status)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -235,7 +249,7 @@ export default function ReferralPayouts() {
                 </span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => fetchPayouts(skip + PAGE_SIZE, status)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

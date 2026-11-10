@@ -3,6 +3,7 @@ import Cookies from 'js-cookie';
 import { CandlestickSeries, AreaSeries, ColorType, createChart } from 'lightweight-charts';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { US_STOCK_LIST, INDIAN_STOCK_LIST, UK_STOCK_LIST } from '../../../api/simulationApi';
+import { useCachedState, useLatestRequest } from '@/lib/pageCache';
 
 const VIEW_OPTIONS = [
   { id: '1s', label: '1s', apiTimeframe: '1s', wsTimeframe: '1s', limit: 320, secondsVisible: true },
@@ -144,9 +145,11 @@ function formatLocalFromChartTime(time, showSeconds = true) {
 }
 
 const StockCharts = () => {
-  const [selectedMarket, setSelectedMarket] = useState('US');
-  const [selectedStock, setSelectedStock] = useState(US_STOCK_LIST[0]);
-  const [viewId, setViewId] = useState('1s');
+  // The chosen market, stock and view are cached, so coming back reopens the
+  // same chart. Candles are live data and always load fresh.
+  const [selectedMarket, setSelectedMarket] = useCachedState('stock-charts:market', 'US');
+  const [selectedStock, setSelectedStock] = useCachedState('stock-charts:stock', US_STOCK_LIST[0]);
+  const [viewId, setViewId] = useCachedState('stock-charts:view', '1s');
   const [candles, setCandles] = useState([]);
   const [latestPrice, setLatestPrice] = useState(null);
   const [wsStatus, setWsStatus] = useState('idle');
@@ -158,6 +161,10 @@ const StockCharts = () => {
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const shouldAutoFitRef = useRef(true);
+  // A slow response for a previous stock, market or view must not overwrite
+  // the one now selected.
+  const { begin: beginStatusRequest, isLatest: isLatestStatus } = useLatestRequest();
+  const { begin: beginCandlesRequest, isLatest: isLatestCandles } = useLatestRequest();
 
   const apiBase = useMemo(() => getClientApiBaseUrl(), []);
   const liveEngineUrl = useMemo(() => getLiveEngineUrl(), []);
@@ -188,12 +195,14 @@ const StockCharts = () => {
 
   const loadMarketStatus = useCallback(async () => {
     if (!liveEngineUrl) return;
+    const id = beginStatusRequest();
     
     try {
       // Fetch market-specific status based on selected market
       const endpoint = selectedMarket === 'US' ? '/api/stocks/us' : selectedMarket === 'India' ? '/api/stocks/indian' : '/api/stocks/uk';
       const response = await fetch(`${liveEngineUrl}${endpoint}`);
       const data = await response.json();
+      if (!isLatestStatus(id)) return;
       
       // API returns { stocks: [...], total: 12, marketStatus: "closed", market: "US" }
       if (data.marketStatus) {
@@ -202,7 +211,7 @@ const StockCharts = () => {
     } catch (err) {
       console.error('Failed to fetch market status:', err);
     }
-  }, [liveEngineUrl, selectedMarket]);
+  }, [liveEngineUrl, selectedMarket, beginStatusRequest, isLatestStatus]);
 
   const loadCandles = useCallback(async () => {
     setError('');
@@ -215,12 +224,14 @@ const StockCharts = () => {
     // Determine asset prefix based on market
     const assetPrefix = selectedMarket === 'US' ? 'stock_' : selectedMarket === 'India' ? 'indian_stock_' : 'uk_stock_';
     const asset = `${assetPrefix}${selectedStock.symbol.toLowerCase()}`;
+    const id = beginCandlesRequest();
     
     try {
       const response = await fetch(
         `${liveEngineUrl}/api/candles?asset=${asset}&interval=${selectedView.apiTimeframe}&limit=${selectedView.limit}`
       );
       const payload = await response.json();
+      if (!isLatestCandles(id)) return;
 
       if (!response.ok) {
         throw new Error(payload?.detail || 'Failed to load candles');
@@ -240,10 +251,11 @@ const StockCharts = () => {
         setCandles([]);
       }
     } catch (err) {
+      if (!isLatestCandles(id)) return;
       console.error('❌ Error loading candles:', err);
       setError(err?.message || 'Unable to fetch candle history');
     }
-  }, [liveEngineUrl, selectedStock, selectedMarket, selectedView]);
+  }, [liveEngineUrl, selectedStock, selectedMarket, selectedView, beginCandlesRequest, isLatestCandles]);
 
   const disconnectWebSocket = useCallback(() => {
     if (wsRef.current) {

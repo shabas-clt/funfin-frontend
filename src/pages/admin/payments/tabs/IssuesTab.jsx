@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { Card, CardContent } from '@/components/ui/card';
 import { paymentsApi, errorText } from '@/api/paymentsApi';
 import { formatNumber, formatShortDateTime } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
 import ActionDialog from '@/components/admin/payments/ActionDialog';
 import { Pager } from '@/components/admin/payments/PurchaseTable';
 import { ChannelBadge, refundReasonLabel, selectClass } from '@/components/admin/payments/badges';
@@ -14,32 +15,44 @@ const PAGE_SIZE = 20;
 // coins, so the refund could not take them all back. Recover takes what the
 // user has now; Dismiss accepts the loss.
 export default function IssuesTab({ onOpenUser }) {
-  const [state, setState] = useState('open');
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // List, filter and page are cached, so coming back to this tab shows the
+  // last list at once and refreshes it in the background.
+  const [state, setState] = useCachedState('payments-issues:state', 'open');
+  const [rows, setRows] = useCachedState('payments-issues:rows', []);
+  const [total, setTotal] = useCachedState('payments-issues:total', 0);
+  const [skip, setSkip] = useCachedState('payments-issues:skip', 0);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState(null);
+  const showSkeleton = loading && !hasCached('payments-issues:rows');
+  const isRefreshing = loading && !showSkeleton;
+  const { begin: beginRequest, isLatest } = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const load = useCallback(
     async (nextSkip = 0) => {
+      const id = beginRequest();
       setLoading(true);
       try {
         const res = await paymentsApi.issues({ state, skip: nextSkip, limit: PAGE_SIZE });
+        if (!isLatest(id)) return;
         setRows(res.issues || []);
         setTotal(res.total || 0);
         setSkip(nextSkip);
       } catch (err) {
+        if (!isLatest(id)) return;
         toast.error(errorText(err, 'Failed to load refund issues'));
       } finally {
-        setLoading(false);
+        if (isLatest(id)) setLoading(false);
       }
     },
-    [state],
+    [state, beginRequest, isLatest, setRows, setTotal, setSkip],
   );
 
   useEffect(() => {
-    load(0);
+    // On open, refresh the page the admin was on; after a filter change, go
+    // back to the first page.
+    load(restorePage(skip, [load]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   const open = (row, type) => {
@@ -100,8 +113,8 @@ export default function IssuesTab({ onOpenUser }) {
                 <th className="px-4 py-2.5 font-medium text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-              {loading && (
+            <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+              {showSkeleton && (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                     <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
@@ -109,14 +122,14 @@ export default function IssuesTab({ onOpenUser }) {
                   </td>
                 </tr>
               )}
-              {!loading && rows.length === 0 && (
+              {!showSkeleton && rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                     {state === 'open' ? 'No open refund issues.' : 'Nothing here.'}
                   </td>
                 </tr>
               )}
-              {!loading &&
+              {!showSkeleton &&
                 rows.map((row) => (
                   <tr key={row.id} className="align-top">
                     <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">

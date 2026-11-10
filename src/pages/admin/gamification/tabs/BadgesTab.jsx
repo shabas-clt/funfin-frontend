@@ -7,6 +7,7 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import FieldError from '@/components/shared/FieldError';
 import { badgeCreateSchema } from '@/lib/validation/schemas';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 function CreateForm({ onCreated }) {
   const {
@@ -180,10 +181,14 @@ function EditCard({ badge, onSaved, onCancel }) {
 }
 
 export default function BadgesTab() {
-  const [rows, setRows] = useState([]);
+  // Cached so reopening this tab shows the last list at once while it
+  // refreshes in the background.
+  const [rows, setRows] = useCachedState('gamification-badges:rows', []);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useCachedState('gamification-badges:search', '');
+  const showSkeleton = loading && !hasCached('gamification-badges:rows');
+  const isRefreshing = loading && !showSkeleton;
 
   const load = useCallback(async () => {
     try {
@@ -195,7 +200,7 @@ export default function BadgesTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setRows]);
 
   useEffect(() => {
     load();
@@ -228,18 +233,18 @@ export default function BadgesTab() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {loading && (
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+        {showSkeleton && (
           <div className="col-span-full p-8 text-center text-sm text-slate-500">
             <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
           </div>
         )}
-        {!loading && filteredRows.length === 0 && (
+        {!showSkeleton && filteredRows.length === 0 && (
           <div className="col-span-full p-8 text-center text-sm text-slate-500">
             No badges yet.
           </div>
         )}
-        {!loading &&
+        {!showSkeleton &&
           filteredRows.map((badge) =>
             editingId === badge.id ? (
               <EditCard

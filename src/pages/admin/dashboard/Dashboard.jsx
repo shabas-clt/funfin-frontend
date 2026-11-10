@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useCachedState } from '@/lib/pageCache';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, Title, Tooltip, Filler, Legend,
@@ -54,10 +55,12 @@ export default function Dashboard() {
   const { admin } = useAuth();
   const isDark = theme === 'dark';
 
-  const [windowDays, setWindowDays] = useState(30);
-  const [summary, setSummary] = useState(null);
-  const [timeseries, setTimeseries] = useState(null);
-  const [recent, setRecent] = useState(null);
+  // Cached so returning to the dashboard shows the last numbers at once while
+  // they refresh. Each section shows as soon as its own request returns.
+  const [windowDays, setWindowDays] = useCachedState('dashboard:windowDays', 30);
+  const [summary, setSummary] = useCachedState('dashboard:summary', null);
+  const [timeseries, setTimeseries] = useCachedState('dashboard:timeseries', null);
+  const [recent, setRecent] = useCachedState('dashboard:recent', null);
 
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
   const [isLoadingSeries, setIsLoadingSeries] = useState(true);
@@ -66,32 +69,42 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     setIsLoadingSummary(true);
-    setIsLoadingSeries(true);
-
-    Promise.allSettled([
-      api.get('/dashboard/summary', { params: { windowDays } }),
-      api.get('/dashboard/timeseries', { params: { days: windowDays } }),
-    ]).then(([summaryRes, seriesRes]) => {
-      if (cancelled) return;
-      if (summaryRes.status === 'fulfilled') {
-        setSummary(summaryRes.value);
-      } else {
+    api
+      .get('/dashboard/summary', { params: { windowDays } })
+      .then((res) => {
+        if (!cancelled) setSummary(res);
+      })
+      .catch(() => {
+        if (cancelled) return;
         toast.error('Failed to load dashboard summary');
         setSummary(null);
-      }
-      if (seriesRes.status === 'fulfilled') {
-        setTimeseries(seriesRes.value);
-      } else {
-        setTimeseries(null);
-      }
-      setIsLoadingSummary(false);
-      setIsLoadingSeries(false);
-    });
-
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSummary(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [windowDays]);
+  }, [windowDays, setSummary]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingSeries(true);
+    api
+      .get('/dashboard/timeseries', { params: { days: windowDays } })
+      .then((res) => {
+        if (!cancelled) setTimeseries(res);
+      })
+      .catch(() => {
+        if (!cancelled) setTimeseries(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSeries(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [windowDays, setTimeseries]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,7 +123,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setRecent]);
 
   const chartPalette = useMemo(() => ({
     courseBar: isDark ? '#6366f1' : '#6366f1',
@@ -314,7 +327,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoadingSummary ? (
+        {isLoadingSummary && !summary ? (
           Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
         ) : summaryCards.map((item, idx) => {
           const Icon = item.icon;
@@ -356,7 +369,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="h-[260px] w-full">
-              {isLoadingSeries ? (
+              {isLoadingSeries && !timeseries ? (
                 <Skeleton className="w-full h-full rounded-lg" />
               ) : (
                 <Bar data={revenueChartData} options={revenueChartOptions} />
@@ -369,7 +382,7 @@ export default function Dashboard() {
           <CardContent className="p-5">
             <h2 className="text-[16px] font-bold text-slate-900 dark:text-white mb-4">New signups</h2>
             <div className="h-[260px] w-full">
-              {isLoadingSeries ? (
+              {isLoadingSeries && !timeseries ? (
                 <Skeleton className="w-full h-full rounded-lg" />
               ) : (
                 <Line data={signupsChartData} options={signupsChartOptions} />
@@ -399,7 +412,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70">
-                {isLoadingRecent ? (
+                {isLoadingRecent && !recent ? (
                   <tr>
                     <td colSpan="5" className="p-6">
                       <Skeleton className="h-4 w-full" />

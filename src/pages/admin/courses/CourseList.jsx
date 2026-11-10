@@ -9,6 +9,8 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { formatShortDate, formatInr, formatUsd } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest, usePageRestore } from '@/lib/pageCache';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 
 const FILTER_OPTIONS = ['All', 'published', 'draft'];
 const PAGE_SIZE = 12;
@@ -28,35 +30,52 @@ export default function CourseList() {
   const navigate = useNavigate();
   const location = useLocation();
   const basePath = location.pathname.startsWith('/mentor') ? '/mentor' : '/admin';
-  const [courses, setCourses] = useState([]);
+  // List, filters and page are cached, so coming back to this page shows the
+  // last list at once and refreshes it in the background. The admin and
+  // mentor panels share this page, so each keeps its own cache.
+  const cacheKey = `courses:${basePath.slice(1)}`;
+  const [courses, setCourses] = useCachedState(`${cacheKey}:rows`, []);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterState, setFilterState] = useState('');
-  const [skip, setSkip] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useCachedState(`${cacheKey}:search`, '');
+  const debouncedSearch = useDebouncedValue(searchQuery);
+  const [filterState, setFilterState] = useCachedState(`${cacheKey}:state`, '');
+  const [skip, setSkip] = useCachedState(`${cacheKey}:skip`, 0);
+  const [total, setTotal] = useCachedState(`${cacheKey}:total`, 0);
+  // Skeleton only when there is nothing to show yet; a refresh keeps the
+  // current rows on screen (dimmed).
+  const showSkeleton = isLoading && !hasCached(`${cacheKey}:rows`);
+  const isRefreshing = isLoading && !showSkeleton;
+  const request = useLatestRequest();
+  const restorePage = usePageRestore();
 
   const fetchCourses = async (nextSkip = skip) => {
+    const id = request.begin();
     try {
       setIsLoading(true);
       const params = { limit: PAGE_SIZE, skip: nextSkip };
       if (filterState) params.state = filterState;
-      if (searchQuery.trim()) params.q = searchQuery.trim();
+      if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       const res = await api.get('/courses', { params });
+      if (!request.isLatest(id)) return;
       setCourses(res.courses || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!request.isLatest(id)) return;
       setCourses([]);
       setTotal(0);
       toast.error('Failed to load courses');
     } finally {
-      setIsLoading(false);
+      if (request.isLatest(id)) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCourses(0);
-  }, [filterState, searchQuery]);
+    // On open, refresh the page the admin was on; after a filter or search
+    // change, go back to the first page.
+    fetchCourses(restorePage(skip, [filterState, debouncedSearch]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterState, debouncedSearch]);
 
   const onSearch = (event) => {
     event.preventDefault();
@@ -140,8 +159,8 @@ export default function CourseList() {
           </div>
 
           {/* Phone (<md): card stack */}
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {isLoading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-24 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -194,8 +213,8 @@ export default function CourseList() {
                   <th className="px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {isLoading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={6} cols={6} />
                 ) : courses.length === 0 ? (
                   <tr>
@@ -260,7 +279,7 @@ export default function CourseList() {
               </tbody>
             </table>
           </div>
-          {!isLoading && total > PAGE_SIZE && (
+          {!showSkeleton && total > PAGE_SIZE && (
             <div className="px-5 pt-2 flex items-center justify-between">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Showing {skip + 1}-{Math.min(skip + PAGE_SIZE, total)} of {total}
@@ -268,7 +287,7 @@ export default function CourseList() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={skip <= 0}
+                  disabled={skip <= 0 || isLoading}
                   onClick={() => fetchCourses(Math.max(0, skip - PAGE_SIZE))}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >
@@ -277,7 +296,7 @@ export default function CourseList() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">{Math.floor(skip / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
                 <button
                   type="button"
-                  disabled={skip + PAGE_SIZE >= total}
+                  disabled={skip + PAGE_SIZE >= total || isLoading}
                   onClick={() => fetchCourses(skip + PAGE_SIZE)}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-40"
                 >

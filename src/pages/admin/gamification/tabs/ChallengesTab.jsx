@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Loader2, Plus, Save, Edit2, Calendar, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import { formatShortDate } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 import ChallengeTypeSelector from '../../../../components/admin/gamification/ChallengeTypeSelector';
 import ConditionalChallengeFields from '../../../../components/admin/gamification/ConditionalChallengeFields';
 import { 
@@ -236,16 +237,26 @@ function ChallengeEditor({ initial, busy, onSave, onCancel }) {
 }
 
 export default function ChallengesTab() {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
+  // List, page and filter are cached so reopening this tab shows the last
+  // page at once while it refreshes in the background.
+  const [rows, setRows] = useCachedState('gamification-challenges:rows', []);
+  const [total, setTotal] = useCachedState('gamification-challenges:total', 0);
+  const [skip, setSkip] = useCachedState('gamification-challenges:skip', 0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [challengeTypeFilter, setChallengeTypeFilter] = useState('');
+  const [challengeTypeFilter, setChallengeTypeFilter] = useCachedState('gamification-challenges:type', '');
+  const showSkeleton = loading && !hasCached('gamification-challenges:rows');
+  const isRefreshing = loading && !showSkeleton;
+  // Stable functions; a slower response for an older page or filter is dropped.
+  const { begin, isLatest } = useLatestRequest();
+  // The filter the shown page belongs to, and the page restored on open.
+  const pageFilter = useRef(challengeTypeFilter);
+  const restoredSkip = useRef(skip);
 
   const load = useCallback(async (nextSkip = 0) => {
+    const id = begin();
     try {
       setLoading(true);
       const params = { skip: nextSkip, limit: PAGE_SIZE };
@@ -254,19 +265,25 @@ export default function ChallengesTab() {
       }
       
       const res = await api.get('/admin/gamification/challenges', { params });
+      if (!isLatest(id)) return;
       setRows(res.items || []);
       setTotal(res.total || 0);
       setSkip(nextSkip);
     } catch {
+      if (!isLatest(id)) return;
       toast.error('Failed to load challenges');
     } finally {
-      setLoading(false);
+      if (isLatest(id)) setLoading(false);
     }
-  }, [challengeTypeFilter]);
+  }, [challengeTypeFilter, begin, isLatest, setRows, setTotal, setSkip]);
 
   useEffect(() => {
-    load(0);
-  }, [load]);
+    // On open, refresh the page the admin was on; after a filter change, go
+    // back to the first page.
+    const keepPage = pageFilter.current === challengeTypeFilter;
+    pageFilter.current = challengeTypeFilter;
+    load(keepPage ? restoredSkip.current : 0);
+  }, [load, challengeTypeFilter]);
 
   const handleCreate = async (payload) => {
     setSaving(true);
@@ -426,8 +443,8 @@ export default function ChallengesTab() {
       </Card>
 
       <Card className="bg-white dark:bg-black border border-slate-100 dark:border-neutral-800">
-        <CardContent className="p-0">
-          {loading ? (
+        <CardContent className={`p-0 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+          {showSkeleton ? (
             <div className="px-4 py-8 text-center text-sm text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
             </div>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Gamepad2, Target, HelpCircle, Award, Crown, Zap } from 'lucide-react';
+import { useCachedState } from '@/lib/pageCache';
 import SpinConfigTab from './tabs/SpinConfigTab';
 import MissionsTab from './tabs/MissionsTab';
 import ChallengesTab from './tabs/ChallengesTab';
@@ -17,7 +17,8 @@ const TABS = [
 ];
 
 export default function GamificationManagement() {
-  const [tab, setTab] = useState('spin');
+  // Cached so coming back to this page reopens the tab the admin was on.
+  const [tab, setTab] = useCachedState('gamification:tab', 'spin');
 
   return (
     <div className="space-y-5">

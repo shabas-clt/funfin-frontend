@@ -9,14 +9,19 @@ import { api } from '@/api/axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import FieldError from '@/components/shared/FieldError';
+import { useCachedState, hasCached } from '@/lib/pageCache';
 
 export default function TokenManagement() {
-  const [tokens, setTokens] = useState([]);
+  // List and search are cached, so coming back to this page shows the last
+  // list at once and refreshes it in the background.
+  const [tokens, setTokens] = useCachedState('live-engine-tokens:rows', []);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = loading && !hasCached('live-engine-tokens:rows');
+  const isRefreshing = loading && !showSkeleton;
   const [showModal, setShowModal] = useState(false);
   const [editingToken, setEditingToken] = useState(null);
   const [visibleTokens, setVisibleTokens] = useState(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useCachedState('live-engine-tokens:search', '');
 
   const [formData, setFormData] = useState({
     token: '',
@@ -28,6 +33,7 @@ export default function TokenManagement() {
 
   useEffect(() => {
     fetchTokens();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchTokens = async () => {
@@ -170,8 +176,8 @@ export default function TokenManagement() {
           </div>
 
           {/* Mobile View */}
-          <div className="md:hidden px-3 pb-3 space-y-2">
-            {loading ? (
+          <div className={`md:hidden px-3 pb-3 space-y-2 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+            {showSkeleton ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="h-24 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
@@ -266,8 +272,8 @@ export default function TokenManagement() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium">
-                {loading ? (
+              <tbody className={`divide-y divide-slate-50 dark:divide-neutral-800/70 text-slate-600 dark:text-slate-300 font-medium transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton ? (
                   <TableSkeleton rows={5} cols={5} />
                 ) : filteredTokens.length === 0 ? (
                   <tr>

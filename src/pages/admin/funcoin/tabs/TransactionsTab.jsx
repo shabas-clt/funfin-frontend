@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Loader2, Plus, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import { funcoinTransactionCreateSchema } from '@/lib/validation/schemas';
 import FieldError from '@/components/shared/FieldError';
 import { formatNumber, formatShortDateTime } from '@/lib/format';
+import { useCachedState, hasCached, useLatestRequest } from '@/lib/pageCache';
 
 const PAGE_SIZE = 20;
 
@@ -175,33 +176,46 @@ function KindIcon({ kind }) {
 }
 
 export default function TransactionsTab() {
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(0);
-  const [kindFilter, setKindFilter] = useState('');
-  const [userIdFilter, setUserIdFilter] = useState('');
-  const [userIdInput, setUserIdInput] = useState('');
+  // Ledger page, filters and categories are cached so reopening this tab
+  // shows the last page at once while it refreshes in the background.
+  const [rows, setRows] = useCachedState('funcoin-transactions:rows', []);
+  const [total, setTotal] = useCachedState('funcoin-transactions:total', 0);
+  const [skip, setSkip] = useCachedState('funcoin-transactions:skip', 0);
+  const [kindFilter, setKindFilter] = useCachedState('funcoin-transactions:kind', '');
+  const [userIdFilter, setUserIdFilter] = useCachedState('funcoin-transactions:userId', '');
+  const [userIdInput, setUserIdInput] = useCachedState('funcoin-transactions:userIdInput', '');
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useCachedState('funcoin-transactions:categories', []);
+  const showSkeleton = loading && !hasCached('funcoin-transactions:rows');
+  const isRefreshing = loading && !showSkeleton;
+  // Stable functions; a slower response for an older page or filter is dropped.
+  const { begin, isLatest } = useLatestRequest();
+  // The filters the shown page belongs to, and the page restored on open.
+  const filterKey = `${kindFilter}|${userIdFilter}`;
+  const pageFilterKey = useRef(filterKey);
+  const restoredSkip = useRef(skip);
 
   const load = useCallback(
     async (nextSkip = 0) => {
+      const id = begin();
       try {
         setLoading(true);
         const params = { skip: nextSkip, limit: PAGE_SIZE };
         if (kindFilter) params.kind = kindFilter;
         if (userIdFilter) params.user_id = userIdFilter;
         const res = await api.get('/funcoin/transactions', { params });
+        if (!isLatest(id)) return;
         setRows(res.transactions || []);
         setTotal(res.total || 0);
         setSkip(nextSkip);
       } catch (err) {
+        if (!isLatest(id)) return;
         toast.error(typeof err === 'string' ? err : 'Failed to load transactions');
       } finally {
-        setLoading(false);
+        if (isLatest(id)) setLoading(false);
       }
     },
-    [kindFilter, userIdFilter],
+    [kindFilter, userIdFilter, begin, isLatest, setRows, setTotal, setSkip],
   );
 
   useEffect(() => {
@@ -213,11 +227,15 @@ export default function TransactionsTab() {
         // Non-fatal — the form just won't have a dropdown.
       }
     })();
-  }, []);
+  }, [setCategories]);
 
   useEffect(() => {
-    load(0);
-  }, [load]);
+    // On open, refresh the page the admin was on; after a filter change, go
+    // back to the first page.
+    const keepPage = pageFilterKey.current === filterKey;
+    pageFilterKey.current = filterKey;
+    load(keepPage ? restoredSkip.current : 0);
+  }, [load, filterKey]);
 
   return (
     <div className="space-y-4">
@@ -285,8 +303,8 @@ export default function TransactionsTab() {
                   <th className="px-4 py-2.5 font-medium">Reference</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {loading && (
+              <tbody className={`divide-y divide-slate-100 dark:divide-neutral-800 transition-opacity ${isRefreshing ? 'opacity-60' : ''}`}>
+                {showSkeleton && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
                       <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
@@ -294,14 +312,14 @@ export default function TransactionsTab() {
                     </td>
                   </tr>
                 )}
-                {!loading && rows.length === 0 && (
+                {!showSkeleton && rows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
                       No transactions match those filters.
                     </td>
                   </tr>
                 )}
-                {!loading &&
+                {!showSkeleton &&
                   rows.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-neutral-900/60">
                       <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
