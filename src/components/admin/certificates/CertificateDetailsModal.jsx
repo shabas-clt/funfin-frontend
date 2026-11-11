@@ -30,10 +30,12 @@ export default function CertificateDetailsModal({ certificate, onClose }) {
               className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                 c.revoked
                   ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  : 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+                  : c.expired
+                    ? 'bg-amber-100/70 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                    : 'bg-emerald-100/70 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
               }`}
             >
-              {c.revoked ? 'Revoked' : 'Active'}
+              {c.revoked ? 'Revoked' : c.expired ? 'Expired' : 'Active'}
             </span>
           }
         />
@@ -44,6 +46,14 @@ export default function CertificateDetailsModal({ certificate, onClose }) {
         <Row label="Course hours" value={`${c.courseHours}h`} />
         <Row label="Completed on" value={formatShortDate(c.completionDate)} />
         <Row label="Issued on" value={formatShortDateTime(c.issuedAt)} />
+        <Row
+          label="Valid through"
+          value={
+            c.expiresAt
+              ? `${formatShortDate(c.expiresAt)} (${c.validityYears === 5 ? '5 years, add-on' : `${c.validityYears} years`})`
+              : 'Set when the student next opens it'
+          }
+        />
       </div>
 
       <div className="flex items-center gap-3 mt-5">

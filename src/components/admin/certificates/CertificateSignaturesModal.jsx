@@ -5,7 +5,14 @@ import { Modal } from '@/components/ui/modal';
 import { certificatesApi } from '@/api/certificatesApi';
 
 const MAX = 60;
-const EMPTY = { instructorName: '', instructorTitle: '', directorName: '', directorTitle: '' };
+const EMPTY = {
+  instructorName: '',
+  instructorTitle: '',
+  directorName: '',
+  directorTitle: '',
+  showInstructor: true,
+  showDirector: true,
+};
 
 const errorText = (err, fallback) => {
   if (typeof err === 'string') return err;
@@ -31,9 +38,33 @@ function Field({ label, hint, value, placeholder, onChange, disabled }) {
   );
 }
 
-// Edit the two signature blocks printed on course certificates: the course
-// mentor and the CEO & Managing Director. A blank field uses the default
-// shown as its placeholder; a blank director name leaves that signature off.
+function SignatureToggle({ label, checked, onChange, disabled }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-neutral-600 dark:bg-neutral-900"
+      />
+      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</span>
+    </label>
+  );
+}
+
+// What's wrong with the form, or null. Mirrors the backend rules: at least
+// one signature, and every ticked signature needs a name.
+const validationError = (v) => {
+  if (!v.showInstructor && !v.showDirector) return 'Select at least one signature.';
+  if (v.showInstructor && !v.instructorName.trim()) return 'Enter the mentor’s name or untick the mentor signature.';
+  if (v.showDirector && !v.directorName.trim()) return 'Enter the director’s name or untick the director signature.';
+  return null;
+};
+
+// Choose which signature blocks are printed on course certificates (course
+// mentor, director, or both) and the names and titles they show. Only the
+// ticked signatures are printed.
 export default function CertificateSignaturesModal({ isOpen, onClose }) {
   const [values, setValues] = useState(EMPTY);
   const [effective, setEffective] = useState(EMPTY);
@@ -51,7 +82,8 @@ export default function CertificateSignaturesModal({ isOpen, onClose }) {
       .getSignatories()
       .then((res) => {
         if (cancelled) return;
-        setValues({ ...EMPTY, ...res.saved });
+        // A director with no saved name was never printed, so start it unticked.
+        setValues({ ...EMPTY, ...res.saved, showDirector: Boolean(res.saved?.showDirector ?? true) && Boolean(res.saved?.directorName) });
         setEffective({ ...EMPTY, ...res.effective });
       })
       .catch((err) => {
@@ -74,7 +106,7 @@ export default function CertificateSignaturesModal({ isOpen, onClose }) {
     setSaving(true);
     try {
       const res = await certificatesApi.saveSignatories(values);
-      setValues({ ...EMPTY, ...res.saved });
+      setValues({ ...EMPTY, ...res.saved, showDirector: Boolean(res.saved?.showDirector ?? true) && Boolean(res.saved?.directorName) });
       setEffective({ ...EMPTY, ...res.effective });
       setDirty(false);
       toast.success('Signatures saved. New certificates will use them.');
@@ -105,26 +137,31 @@ export default function CertificateSignaturesModal({ isOpen, onClose }) {
   };
 
   const busy = loading || saving;
+  const problem = validationError(values);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Certificate signatures" className="max-w-xl dark:bg-neutral-950">
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        These names are printed on newly issued certificates. Certificates already issued keep their
-        existing PDF until they are regenerated.
+        Tick the signatures to print on newly issued certificates. Certificates already issued keep
+        their existing PDF until they are regenerated.
       </p>
 
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Course mentor</h3>
-          <Field label="Name" value={values.instructorName} placeholder={effective.instructorName} onChange={set('instructorName')} disabled={busy} />
-          <Field label="Title" value={values.instructorTitle} placeholder={effective.instructorTitle} onChange={set('instructorTitle')} disabled={busy} hint="Printed as “Title, FunFin”." />
+          <SignatureToggle label="Course mentor" checked={values.showInstructor} onChange={set('showInstructor')} disabled={busy} />
+          <Field label="Name" value={values.instructorName} placeholder="e.g. full name" onChange={set('instructorName')} disabled={busy || !values.showInstructor} />
+          <Field label="Title" value={values.instructorTitle} placeholder={effective.instructorTitle || 'Lead Mentor'} onChange={set('instructorTitle')} disabled={busy || !values.showInstructor} hint="Printed as “Title, FunFin”." />
         </div>
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Director</h3>
-          <Field label="Name" value={values.directorName} placeholder="e.g. full name" onChange={set('directorName')} disabled={busy} hint="Leave blank to print only the mentor’s signature." />
-          <Field label="Title" value={values.directorTitle} placeholder="CEO & Managing Director" onChange={set('directorTitle')} disabled={busy} />
+          <SignatureToggle label="Director" checked={values.showDirector} onChange={set('showDirector')} disabled={busy} />
+          <Field label="Name" value={values.directorName} placeholder="e.g. full name" onChange={set('directorName')} disabled={busy || !values.showDirector} />
+          <Field label="Title" value={values.directorTitle} placeholder="CEO & Managing Director" onChange={set('directorTitle')} disabled={busy || !values.showDirector} />
         </div>
       </div>
+
+      {dirty && problem && (
+        <p className="mt-4 text-sm text-amber-600 dark:text-amber-400">{problem}</p>
+      )}
 
       <div className="mt-6 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
         <button
@@ -148,7 +185,7 @@ export default function CertificateSignaturesModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={handleSave}
-            disabled={busy || !dirty}
+            disabled={busy || !dirty || Boolean(problem)}
             className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}

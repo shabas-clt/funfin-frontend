@@ -51,6 +51,43 @@ function FuncoinPreview({ priceUsd, priceInr, rate }) {
   );
 }
 
+// Pick the main courses this course is an add-on for. Owning an add-on
+// extends the student's certificate for each selected course from 3 to 5
+// years. Add-ons can't stack, so other add-ons aren't offered, and a course
+// that already has add-ons can't become one.
+function AddOnForPicker({ courseId, courses, value, onChange }) {
+  const hasAddOns = Boolean(courseId) && courses.some((c) => (c.addOnFor || []).includes(courseId));
+  const options = courses.filter((c) => c.id !== courseId && !(c.addOnFor || []).length);
+  const toggle = (id) => onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+
+  if (hasAddOns) {
+    return (
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Other courses are add-ons for this one, so it can’t be an add-on itself.
+      </p>
+    );
+  }
+  if (!options.length) {
+    return <p className="text-sm text-slate-500 dark:text-slate-400">No other courses to choose from yet.</p>;
+  }
+  return (
+    <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-900">
+      {options.map((c) => (
+        <label key={c.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-900">
+          <input
+            type="checkbox"
+            checked={value.includes(c.id)}
+            onChange={() => toggle(c.id)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-neutral-600 dark:bg-neutral-900"
+          />
+          <span className="text-sm text-slate-800 dark:text-slate-100 truncate">{c.title}</span>
+          {c.state === 'draft' && <span className="ml-auto text-[11px] text-amber-600 dark:text-amber-400">draft</span>}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export default function CourseEditor() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,6 +100,8 @@ export default function CourseEditor() {
   const [rate, setRate] = useState(null);
   const [course, setCourse] = useState(null);
   const [tagsDraft, setTagsDraft] = useState('');
+  const [addOnFor, setAddOnFor] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
 
   const form = useForm({
     resolver: yupResolver(isEdit ? courseUpdateSchema : courseCreateSchema),
@@ -95,6 +134,17 @@ export default function CourseEditor() {
   }, []);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/courses', { params: { limit: 200 } });
+        setAllCourses(res.courses || []);
+      } catch {
+        // Non-fatal; the add-on picker just shows no options.
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     if (!isEdit) return;
     (async () => {
       try {
@@ -114,6 +164,7 @@ export default function CourseEditor() {
           tags: data.tags || [],
         });
         setTagsDraft((data.tags || []).join(', '));
+        setAddOnFor(data.addOnFor || []);
       } catch (err) {
         toast.error(typeof err === 'string' ? err : 'Failed to load course');
         navigate(`${basePath}/courses`);
@@ -132,7 +183,7 @@ export default function CourseEditor() {
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
 
-    const payload = { ...values, tags };
+    const payload = { ...values, tags, addOnFor };
 
     setSaving(true);
     try {
@@ -155,6 +206,8 @@ export default function CourseEditor() {
         }
         const originalTags = (course?.tags || []).join(',');
         if (originalTags !== tags.join(',')) diff.tags = tags;
+        const sortedIds = (ids) => [...ids].sort().join(',');
+        if (sortedIds(course?.addOnFor || []) !== sortedIds(addOnFor)) diff.addOnFor = addOnFor;
         if (Object.keys(diff).length === 0) {
           toast.info('No changes to save');
           setSaving(false);
@@ -337,6 +390,19 @@ export default function CourseEditor() {
               </div>
             </div>
             <FuncoinPreview priceUsd={Number(priceUsd) || 0} priceInr={Number(priceInr) || 0} rate={rate} />
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white dark:bg-neutral-950 rounded-2xl">
+          <CardContent className="p-4 sm:p-6 space-y-3">
+            <div>
+              <h2 className="text-[15px] font-bold text-slate-900 dark:text-white">Add-on for</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Certificates are valid for 3 years. Students who own this course get the certificate of each
+                selected course extended to 5 years. Leave empty for a regular course.
+              </p>
+            </div>
+            <AddOnForPicker courseId={id} courses={allCourses} value={addOnFor} onChange={setAddOnFor} />
           </CardContent>
         </Card>
 

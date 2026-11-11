@@ -4,11 +4,18 @@ import { formatShortDate, formatShortDateTime } from '@/lib/format';
 const TH =
   'px-5 py-4 font-semibold text-[12px] uppercase tracking-wide text-slate-500 dark:text-slate-400';
 
-function StatusBadge({ revoked }) {
+function StatusBadge({ revoked, expired }) {
   if (revoked) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
         Revoked
+      </span>
+    );
+  }
+  if (expired) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-amber-100/70 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+        Expired
       </span>
     );
   }
@@ -32,6 +39,7 @@ export default function CertificatesTable({ certificates, onViewDetails, onDelet
               <th className={TH}>Hours</th>
               <th className={TH}>Completed</th>
               <th className={TH}>Issued</th>
+              <th className={TH}>Valid through</th>
               <th className={TH}>Status</th>
               <th className={`${TH} text-right`}>Actions</th>
             </tr>
@@ -65,8 +73,14 @@ export default function CertificatesTable({ certificates, onViewDetails, onDelet
                 <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
                   {formatShortDateTime(cert.issuedAt)}
                 </td>
+                <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">
+                  {cert.expiresAt ? formatShortDate(cert.expiresAt) : '—'}
+                  {cert.validityYears === 5 && (
+                    <span className="ml-1 text-[11px] text-indigo-500 dark:text-indigo-400">(add-on)</span>
+                  )}
+                </td>
                 <td className="px-5 py-3.5">
-                  <StatusBadge revoked={cert.revoked} />
+                  <StatusBadge revoked={cert.revoked} expired={cert.expired} />
                 </td>
                 <td className="px-5 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-2">
